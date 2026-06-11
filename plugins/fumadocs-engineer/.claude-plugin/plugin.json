@@ -3,10 +3,10 @@
   "description": "Master senior engineer skill for Fumadocs — the Next.js/React docs framework. Covers all UI components, MDX authoring, project setup, search, CLI, and advanced integrations with version-aware code generation.",
   "version": "1.0.0",
   "author": {
-    "name": "nchekwa",
-    "url": "https://github.com/nchekwa"
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
   },
-  "homepage": "https://github.com/nchekwa/nchekwa-skills",
-  "repository": "https://github.com/nchekwa/nchekwa-skills",
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
   "license": "MIT"
 }

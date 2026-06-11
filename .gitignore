@@ -9,6 +9,3 @@ Thumbs.db
 # Packaged skill archives (built artifacts, not source)
 *.skill
 
-# Generated skills/ directory at repo root — source of truth is plugins/
-# Run `python plugins2skills.py` to regenerate
-/skills/
