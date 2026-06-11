@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "yamlcrew-skills",
   "version": "1.0.0",
-  "description": "Curated agent skills by yamlcrew — Fumadocs engineer and more. High-quality, reference-dense skills for AI coding agents.",
+  "description": "Curated agent skills by yamlcrew and nchekwa.",
   "owner": {
     "name": "yamlcrew",
     "url": "https://github.com/yamlcrew"

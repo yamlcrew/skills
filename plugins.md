@@ -247,7 +247,7 @@ Users add your marketplace by running:
 /plugin marketplace add <github-owner>/<github-repo>
 ```
 
-Example: `/plugin marketplace add nchekwa/nchekwa-skills`
+Example: `/plugin marketplace add yamlcrew/skills`
 
 ### Installing a plugin
 
@@ -255,7 +255,7 @@ Example: `/plugin marketplace add nchekwa/nchekwa-skills`
 /plugin install <plugin-name>@<marketplace-name>
 ```
 
-Example: `/plugin install fumadocs-engineer@nchekwa-skills`
+Example: `/plugin install fumadocs-engineer@skills`
 
 ### Auto-updating
 
@@ -264,7 +264,7 @@ Marketplaces support auto-updating — Claude Code periodically refreshes the ma
 ## How this repo is organized
 
 ```
-nchekwa-skills/
+<root>/
 ├── .claude-plugin/
 │   └── marketplace.json              ← Marketplace registry
 ├── plugins/                          ← Source of truth for all plugins

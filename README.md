@@ -1,11 +1,11 @@
-# nchekwa-skills
+# skills
 
-Curated agent skills by nchekwa. High-quality, reference-dense skills for AI coding agents.
+Curated agent skills by [yamlcrew ](https://yamlcrew.ai)and [nchekwa](https://nchekwa.com). High-quality, reference-dense skills for AI coding agents.
 
 ## Plugins
 
 | Plugin | Description |
-|---|---|
+| --- | --- |
 | [fumadocs-engineer](./plugins/fumadocs-engineer) | Master senior engineer for Fumadocs — the Next.js/React docs framework |
 
 ## Install
@@ -13,20 +13,20 @@ Curated agent skills by nchekwa. High-quality, reference-dense skills for AI cod
 ### skills.sh (Claude Code, Cursor, Codex, OpenCode, Windsurf, Gemini CLI, GitHub Copilot, 50+ agents)
 
 ```bash
-npx skills add nchekwa/fumadocs-engineer
+npx skills add yamlcrew/fumadocs-engineer
 ```
 
 ### Claude Code Plugin Marketplace
 
 ```bash
-/plugin marketplace add nchekwa/nchekwa-skills
-/plugin install fumadocs-engineer@nchekwa-skills
+/plugin marketplace add yamlcrew/skills
+/plugin install fumadocs-engineer@skills
 ```
 
 ## Repository structure
 
 ```
-nchekwa-skills/
+<root>/
 ├── .claude-plugin/
 │   └── marketplace.json              ← Marketplace registry for Claude Code
 ├── plugins/                          ← Source of truth for all plugins
