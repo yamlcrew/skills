@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "nchekwa-skills",
+  "version": "1.0.0",
+  "description": "Curated agent skills by nchekwa — Fumadocs engineer and more. High-quality, reference-dense skills for AI coding agents.",
+  "owner": {
+    "name": "nchekwa",
+    "url": "https://github.com/nchekwa"
+  },
+  "plugins": [
+    {
+      "name": "fumadocs-engineer",
+      "description": "Master senior engineer skill for Fumadocs — the Next.js/React docs framework. Covers all UI components, MDX authoring, project setup, search, CLI, and advanced integrations with version-aware code generation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "nchekwa",
+        "url": "https://github.com/nchekwa"
+      },
+      "source": "./plugins/fumadocs-engineer",
+      "category": "development"
+    }
+  ]
+}
