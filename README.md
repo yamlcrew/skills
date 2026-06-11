@@ -4,9 +4,7 @@ Curated agent skills by [yamlcrew ](https://yamlcrew.ai)and [nchekwa](https://nc
 
 ## Plugins
 
-| Plugin | Description |
-| --- | --- |
-| [fumadocs-engineer](./plugins/fumadocs-engineer) | Senior engineer for Fumadocs, the Next.js documentation framework — scaffolds, configures, and debugs docs sites and authors MDX content |
+See the full list in [plugins-list.md](./plugins-list.md).
 
 ## Install
 
@@ -26,7 +24,7 @@ npx skills add yamlcrew/skills
 
 ```bash
 /plugin marketplace add yamlcrew/skills
-/plugin install fumadocs-engineer@yamlcrew
+/plugin install <plugin-name>@yamlcrew
 ```
 
 ## Repository structure
@@ -36,11 +34,11 @@ npx skills add yamlcrew/skills
 ├── .claude-plugin/
 │   └── marketplace.json              ← Marketplace registry for Claude Code
 ├── plugins/                          ← Source of truth for all plugins
-│   └── fumadocs-engineer/
+│   └── <plugin-name>/
 │       ├── .claude-plugin/
 │       │   └── plugin.json           ← Plugin manifest
 │       ├── skills/
-│       │   └── fumadocs-engineer/
+│       │   └── <skill-name>/
 │       │       ├── SKILL.md
 │       │       └── references/
 │       │           └── *.md
@@ -50,6 +48,7 @@ npx skills add yamlcrew/skills
 ├── plugins2skills.py                 ← Sync: plugins/ → skills/
 ├── plugins.md                        ← Plugin authoring guide
 ├── skills.md                         ← Skill authoring guide
+├── plugins-list.md                   ← Catalog of available plugins
 ├── CLAUDE.md                         ← Guidance for Claude Code in this repo
 ├── README.md
 └── LICENSE
@@ -60,7 +59,7 @@ npx skills add yamlcrew/skills
 1. Create `plugins/<name>/` with `.claude-plugin/plugin.json` and `skills/`
 2. Register in `.claude-plugin/marketplace.json`
 3. Run `python plugins2skills.py` to sync
-4. Add the skill to a grouping in `skills.sh.json` and to the Plugins table above
+4. Add the skill to a grouping in `skills.sh.json` and to the table in `plugins-list.md`
 5. Commit and push
 
 See [plugins.md](./plugins.md) and [skills.md](./skills.md) for full guides.

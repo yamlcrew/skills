@@ -47,7 +47,7 @@ Validation is manual: ensure `plugin.json` and `marketplace.json` are valid JSON
 2. Register/update the entry in `.claude-plugin/marketplace.json` → `plugins[]` (manual).
 3. Run `python plugins2skills.py` to regenerate `skills/`.
 4. Add the skill's `name` to the best-fitting grouping in `skills.sh.json` (reuse an existing group; only add a new grouping as a last resort).
-5. Update the Plugins table in `README.md`.
+5. Add the plugin to the table in `plugins-list.md`.
 6. Record the change in `CHANGELOG.md` under `## [Unreleased]` — **every plugin change is logged here, and the file must follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)** (sections `Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`; full template in `plugins.md`). On release, rename `[Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and bump `version` (SemVer `MAJOR.MINOR.PATCH`) in both manifests.
 7. Commit `plugins/`, `marketplace.json`, `skills.sh.json`, `CHANGELOG.md`, and the regenerated `skills/` together.
 
