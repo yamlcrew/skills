@@ -63,6 +63,8 @@ The manifest defines the plugin's identity. It's optional (Claude Code auto-disc
 | `repository` | Optional | Link to source repo |
 | `license` | Optional | SPDX license identifier |
 
+> **Keep `description` identical and unambiguous across both manifests.** The same text must appear in two places: `.claude-plugin/marketplace.json` → `plugins[].description` and `plugins/<plugin-name>/.claude-plugin/plugin.json` → `description`. Write one short, concrete sentence that leaves no doubt what the plugin *is* — not marketing copy. When you change one, change the other.
+
 ### Version management
 
 - **With `version`**: users receive updates only when you bump the version string
@@ -255,7 +257,7 @@ Example: `/plugin marketplace add yamlcrew/skills`
 /plugin install <plugin-name>@<marketplace-name>
 ```
 
-Example: `/plugin install fumadocs-engineer@skills`
+Example: `/plugin install fumadocs-engineer@yamlcrew`
 
 ### Auto-updating
 
@@ -276,7 +278,7 @@ Marketplaces support auto-updating — Claude Code periodically refreshes the ma
 │       │       ├── SKILL.md
 │       │       └── references/
 │       └── README.md
-├── skills/                           ← Generated (plugins2skills.py), in .gitignore
+├── skills/                           ← Generated (plugins2skills.py); committed (skills.sh reads it)
 │   └── fumadocs-engineer/
 │       ├── SKILL.md
 │       └── references/
@@ -294,7 +296,76 @@ Marketplaces support auto-updating — Claude Code periodically refreshes the ma
 3. Add `skills/<skill-name>/SKILL.md` inside the plugin
 4. Register in `.claude-plugin/marketplace.json` under `plugins[]`
 5. Run `python plugins2skills.py` to generate `skills/` for skills.sh
-6. Commit and push
+6. Record the change in `CHANGELOG.md` under `## [Unreleased]` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format) — every plugin change is logged here
+7. Commit and push
+
+## Changelog
+
+Every plugin change **must** be recorded in `CHANGELOG.md`, and the file **must follow** the [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) format. Add entries under `## [Unreleased]` as you work; on release, rename that heading to `## [x.y.z] - YYYY-MM-DD` (SemVer `MAJOR.MINOR.PATCH`, matching the `version` in both manifests) and open a fresh `## [Unreleased]`.
+
+Use **only** these six change-type sections, in this order, omitting any that are empty:
+
+| Section | Use for |
+|---|---|
+| `Added` | New features. |
+| `Changed` | Changes in existing functionality. |
+| `Deprecated` | Soon-to-be-removed features. |
+| `Removed` | Now-removed features. |
+| `Fixed` | Bug fixes. |
+| `Security` | Vulnerability fixes. |
+
+### Template
+
+````markdown
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- A feature that has landed but is not yet released.
+
+## [1.1.0] - 2026-07-01
+
+### Added
+
+- A new capability.
+
+### Changed
+
+- Reworded a plugin description.
+
+### Deprecated
+
+- Old config key; removal planned for 2.0.0.
+
+### Removed
+
+- A legacy reference file.
+
+### Fixed
+
+- Broken import path in a SKILL.md example.
+
+### Security
+
+- Patched a command-injection risk in a helper script.
+
+## [1.0.0] - 2026-06-11
+
+### Added
+
+- Initial release.
+
+[Unreleased]: https://github.com/yamlcrew/skills/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/yamlcrew/skills/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/yamlcrew/skills/releases/tag/v1.0.0
+````
 
 ## Sources
 
@@ -302,3 +373,4 @@ Marketplaces support auto-updating — Claude Code periodically refreshes the ma
 - [Plugins Reference](https://code.claude.com/docs/en/plugins-reference) — full technical spec
 - [Plugin Marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) — distributing plugins
 - [Marketplace JSON schema](https://json.schemastore.org/claude-code-marketplace.json) — JSON Schema validation
+- [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) — changelog format

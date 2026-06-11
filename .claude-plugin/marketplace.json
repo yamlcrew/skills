@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "yamlcrew-skills",
+  "name": "yamlcrew",
   "version": "1.0.0",
   "description": "Curated agent skills by yamlcrew and nchekwa.",
   "owner": {
@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "fumadocs-engineer",
-      "description": "Master senior engineer skill for Fumadocs — the Next.js/React docs framework. Covers all UI components, MDX authoring, project setup, search, CLI, and advanced integrations with version-aware code generation.",
+      "description": "Senior engineer for Fumadocs, the Next.js documentation framework — scaffolds, configures, and debugs docs sites and authors MDX content.",
       "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
