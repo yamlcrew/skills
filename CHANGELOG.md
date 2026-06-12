@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased](https://github.com/yamlcrew/skills/compare/v1.0.0...HEAD)
 
+### Added
+
+- **opencode-agent-cc** plugin — delegate to the headless OpenCode CLI from Claude Code, respecting the user's configured provider and model. Includes:
+  - `opencode-agent-cc` skill (with `references/opencode-cli.md`) — how to drive `opencode run` headless, choose the read-only `plan` vs write `build` agent, and never override the user's default model/plan.
+  - `opencode-rescue` subagent — write-capable thin forwarder that hands a task to `opencode run` and returns its output verbatim.
+  - Slash commands: `review`, `adversarial-review` (read-only, via the `plan` agent), `rescue` (write-capable), `status`, and `cancel`.
+  - `scripts/opencode-info.mjs` — secret-safe Node detector reporting opencode location, version, paths, configured default model, providers (baseURL only), models, and MCP servers.
+  - `prompts/adversarial-review.md` and `prompts/rescue.md` — portable prompt templates.
+
 ## [1.0.0](https://github.com/yamlcrew/skills/releases/tag/v1.0.0) - 2026-06-11
 
 ### Added
