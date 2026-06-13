@@ -36,7 +36,7 @@ opencode debug config 2>/dev/null | grep -E '"(model|small_model)":'
 - **User explicitly asked for a specific/different model** → only then pass `--model <provider/model>`,
   and only an id that appears in `opencode models`.
 
-### ⚠️ Provider/plan affects billing — never swap it
+### ⚠ Provider/plan affects billing — never swap it
 
 The same model can be served by different providers/plans that are billed differently — e.g.
 `zai-coding-plan/*` (Z.AI **Coding Plan** subscription) vs a standard `zai/*` pay-per-token API

@@ -1,0 +1,84 @@
+name: Snyk Agent Scan (skills)
+
+# Scans the published skills/ content with Snyk's Agent Scan skill inspector
+# (https://github.com/snyk/agent-scan) — the same scanner that powers the
+# skills.sh /security/snyk findings (e.g. W021 hidden-Unicode).
+#
+# REPORT-ONLY: this workflow never fails CI. Findings are written to the job
+# summary and uploaded as an artifact. To enforce a threshold later, gate on the
+# scanner exit code or parse agent-scan-report.json.
+#
+# PREREQUISITE: a `SNYK_TOKEN` repository secret (free account at
+# https://app.snyk.io/account). Without it the job skips with a warning so that
+# pull requests from forks (which have no access to secrets) do not break.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - "plugins/**"
+      - ".github/workflows/skill-scan.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - "plugins/**"
+      - ".github/workflows/skill-scan.yml"
+  schedule:
+    - cron: "0 6 * * 1" # weekly (Mon 06:00 UTC) — re-scan as Snyk's rules evolve
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan skills/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run Snyk Agent Scan (report-only)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "## Snyk Agent Scan — skills/" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "${SNYK_TOKEN:-}" ]; then
+            echo "::warning::SNYK_TOKEN not set — skipping Snyk Agent Scan."
+            echo "_SNYK_TOKEN secret not set; scan skipped._" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Human-readable pass for the job summary (report-only: never fails CI).
+          set +e
+          uvx snyk-agent-scan@latest --skills skills 2>&1 | tee scan.txt
+          status=$?
+          set -e
+
+          # Machine-readable pass for the uploaded artifact.
+          uvx snyk-agent-scan@latest --skills skills --json > agent-scan-report.json 2>/dev/null || true
+
+          {
+            echo "Scanner exit code: \`${status}\` (report-only — does not fail CI)"
+            echo ""
+            echo '```'
+            tail -c 60000 scan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-agent-scan-report
+          path: |
+            agent-scan-report.json
+            scan.txt
+          if-no-files-found: ignore
+          retention-days: 30

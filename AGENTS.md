@@ -41,6 +41,10 @@ python plugins2skills.py --dry-run  # preview the sync (no writes)
 
 Validation is manual: ensure `plugin.json` and `marketplace.json` are valid JSON, and that every `SKILL.md` has `name` + `description` frontmatter.
 
+## CI
+
+`.github/workflows/skill-scan.yml` runs [Snyk Agent Scan](https://github.com/snyk/agent-scan) over the published `skills/` directory — the same scanner behind the skills.sh `/security/snyk` findings. It is **report-only** (never fails CI): results go to the job summary and an artifact. Needs a `SNYK_TOKEN` repository secret; without it the job skips. This is the only CI; there is still no build step or test suite.
+
 ## Adding or editing a plugin
 
 1. Create/edit under `plugins/<plugin-name>/` (`.claude-plugin/plugin.json` + `skills/<skill-name>/SKILL.md`).
