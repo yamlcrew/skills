@@ -12,9 +12,8 @@ description: >-
 # Delegating to OpenCode from Claude Code
 
 Run the standalone **OpenCode** CLI (`opencode`) headless from a `Bash` tool call to get a second
-take on a task — then relay its output. This replaces the defunct `tasict/opencode-plugin-cc`
-plugin (its Claude consumer-OAuth path was blocked Jan 2026); this approach uses whatever provider
-OpenCode is already authenticated with, no OAuth required.
+take on a task — then relay its output. This approach uses whatever provider OpenCode is already
+authenticated with, no OAuth required.
 
 ## The one rule: use the model the user already configured
 

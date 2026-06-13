@@ -1,6 +1,10 @@
 # skills
 
-Curated agent skills by [yamlcrew ](https://yamlcrew.ai)and [nchekwa](https://nchekwa.com). High-quality, reference-dense skills for AI coding agents.
+Curated agent skills by [yamlcrew ](https://yamlcrew.ai)and [nchekwa](https://nchekwa.com). High-quality, reference-dense skills for AI coding agents. List of skills via `skils.sh` :
+
+```
+https://www.skills.sh/yamlcrew/skills
+```
 
 ## Plugins
 
