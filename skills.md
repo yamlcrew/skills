@@ -196,6 +196,22 @@ This means:
 
 **When in doubt, ask.** If you're unsure which group a skill belongs to, don't decide alone — contact the user: name the 3 best-fitting existing groups (in your judgement) and ask whether to add the skill to one of them or create a new group.
 
+## Security scanning
+
+Skills should be scanned for security issues (hidden Unicode, prompt-injection markers, etc.) **before publishing**. Run [Snyk Agent Scan](https://github.com/snyk/agent-scan) locally against the generated `skills/` directory:
+
+```bash
+uvx snyk-agent-scan@latest ./skills/
+```
+
+To scan a single skill, point it at that skill's directory or `SKILL.md`:
+
+```bash
+uvx snyk-agent-scan@latest ./skills/fumadocs-engineer/SKILL.md
+```
+
+This is the same scanner that powers the skills.sh `/security/snyk` findings (e.g. `W021` hidden-Unicode) and runs in CI via `.github/workflows/skill-scan.yml`. Scanning locally catches problems before the commit instead of after the push.
+
 ## Publishing to skills.sh
 
 1. Write your skill in `plugins/<plugin-name>/skills/<skill-name>/`

@@ -5,6 +5,7 @@ Thumbs.db
 # Editor folders
 .vscode/
 .idea/
+.env
 
 # Build folders
 build/

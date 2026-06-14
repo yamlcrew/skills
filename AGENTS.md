@@ -43,7 +43,7 @@ Validation is manual: ensure `plugin.json` and `marketplace.json` are valid JSON
 
 ## CI
 
-`.github/workflows/skill-scan.yml` runs [Snyk Agent Scan](https://github.com/snyk/agent-scan) over the published `skills/` directory — the same scanner behind the skills.sh `/security/snyk` findings. It is **report-only** (never fails CI): results go to the job summary and an artifact. Needs a `SNYK_TOKEN` repository secret; without it the job skips. This is the only CI; there is still no build step or test suite.
+`.github/workflows/skill-scan.yml` runs [Snyk Agent Scan](https://github.com/snyk/agent-scan) over the published `skills/` directory — the same scanner behind the skills.sh `/security/snyk` findings. It is **gating**: only error-class findings fail CI — codes starting with `E` (analysis errors) or `X` (scan/runtime failures). Warnings (`W*`) are reported but never fail the build. Because the scanner is LLM-based and non-deterministic (the same content can flag a finding on one run and pass clean on the next), the workflow scans `RUNS` times (default 3) and `.github/scripts/scan_summary.py` fails the job only on **repeatable** errors — those seen in a majority of runs (e.g. ≥2/3); one-off flaky findings are reported but do not fail. The full report goes to the job summary and an artifact. Needs a `SNYK_TOKEN` repository secret; without it the job skips. This is the only CI; there is still no build step or test suite.
 
 ## Adding or editing a plugin
 
