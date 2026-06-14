@@ -1,0 +1,12 @@
+{
+  "name": "pi-agent-cc",
+  "description": "Run the headless pi CLI (`pi -p`) from Claude Code for code review, adversarial review, second opinions, and write-capable rescue/fix tasks — respecting the user's configured provider and model.",
+  "version": "1.0.0",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}

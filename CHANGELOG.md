@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - CI workflow `.github/workflows/skill-scan.yml` — runs [Snyk Agent Scan](https://github.com/snyk/agent-scan) (`uvx snyk-agent-scan@latest --skills skills`) on the published `skills/` content. Report-only (never fails CI); writes findings to the job summary and uploads them as an artifact. Requires a `SNYK_TOKEN` repository secret; skips gracefully when absent.
+- **pi-agent-cc** plugin — delegate to the headless pi CLI (`pi -p`) from Claude Code, respecting the user's configured provider and model. The pi analog of `opencode-agent-cc`. Includes:
+  - `pi-agent-cc` skill (with `references/pi-cli.md`) — how to drive `pi -p` headless, enforce read-only via a `--tools read,grep,find,ls,bash` allowlist vs write-capable bare `pi -p` (print mode never prompts, no sandbox), and never override the user's default model/plan.
+  - `pi-rescue` subagent — write-capable thin forwarder that hands a task to `pi -p` and returns its output verbatim.
+  - Slash commands: `review`, `adversarial-review` (read-only, via the tool allowlist), `rescue` (write-capable), `status`, and `cancel`.
+  - `scripts/pi-info.mjs` — secret-safe Node detector reporting the pi binary, version, configured default provider/model/thinking level, packages/extensions/skills, available models, and live headless pi processes.
+  - `prompts/adversarial-review.md` and `prompts/rescue.md` — portable prompt templates.
 - **opencode-agent-cc** plugin — delegate to the headless OpenCode CLI from Claude Code, respecting the user's configured provider and model. Includes:
   - `opencode-agent-cc` skill (with `references/opencode-cli.md`) — how to drive `opencode run` headless, choose the read-only `plan` vs write `build` agent, and never override the user's default model/plan.
   - `opencode-rescue` subagent — write-capable thin forwarder that hands a task to `opencode run` and returns its output verbatim.

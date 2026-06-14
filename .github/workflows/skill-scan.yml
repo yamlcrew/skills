@@ -4,9 +4,9 @@ name: Snyk Agent Scan (skills)
 # (https://github.com/snyk/agent-scan) — the same scanner that powers the
 # skills.sh /security/snyk findings (e.g. W021 hidden-Unicode).
 #
-# REPORT-ONLY: this workflow never fails CI. Findings are written to the job
-# summary and uploaded as an artifact. To enforce a threshold later, gate on the
-# scanner exit code or parse agent-scan-report.json.
+# REPORT-ONLY: this workflow never fails CI. Findings are rendered into the job
+# summary (from the JSON report) and uploaded as an artifact. To enforce a
+# threshold later, gate on agent-scan-report.json.
 #
 # PREREQUISITE: a `SNYK_TOKEN` repository secret (free account at
 # https://app.snyk.io/account). Without it the job skips with a warning so that
@@ -19,11 +19,13 @@ on:
       - "skills/**"
       - "plugins/**"
       - ".github/workflows/skill-scan.yml"
+      - ".github/scripts/scan_summary.py"
   pull_request:
     paths:
       - "skills/**"
       - "plugins/**"
       - ".github/workflows/skill-scan.yml"
+      - ".github/scripts/scan_summary.py"
   schedule:
     - cron: "0 6 * * 1" # weekly (Mon 06:00 UTC) — re-scan as Snyk's rules evolve
   workflow_dispatch: {}
@@ -37,48 +39,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: false # uvx fetches a one-shot tool; no project deps to cache
 
       - name: Run Snyk Agent Scan (report-only)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           set -euo pipefail
-          echo "## Snyk Agent Scan — skills/" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -z "${SNYK_TOKEN:-}" ]; then
             echo "::warning::SNYK_TOKEN not set — skipping Snyk Agent Scan."
-            echo "_SNYK_TOKEN secret not set; scan skipped._" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## Snyk Agent Scan — \`skills/\`"
+              echo ""
+              echo "_SNYK_TOKEN secret not set; scan skipped._"
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          # Human-readable pass for the job summary (report-only: never fails CI).
-          set +e
-          uvx snyk-agent-scan@latest --skills skills 2>&1 | tee scan.txt
-          status=$?
-          set -e
+          # Single JSON run — the JSON report carries the actual findings
+          # (the plain text output only lists which skills were scanned).
+          # report-only: a non-zero exit must never fail the job.
+          uvx snyk-agent-scan@latest --skills skills --json > agent-scan-report.json || true
 
-          # Machine-readable pass for the uploaded artifact.
-          uvx snyk-agent-scan@latest --skills skills --json > agent-scan-report.json 2>/dev/null || true
-
-          {
-            echo "Scanner exit code: \`${status}\` (report-only — does not fail CI)"
-            echo ""
-            echo '```'
-            tail -c 60000 scan.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          # Render a Markdown summary from the JSON into the job summary + a file.
+          python3 .github/scripts/scan_summary.py agent-scan-report.json \
+            | tee summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload scan report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snyk-agent-scan-report
           path: |
             agent-scan-report.json
-            scan.txt
+            summary.md
           if-no-files-found: ignore
           retention-days: 30

@@ -29,6 +29,17 @@
       },
       "source": "./plugins/opencode-agent-cc",
       "category": "development"
+    },
+    {
+      "name": "pi-agent-cc",
+      "description": "Run the headless pi CLI (`pi -p`) from Claude Code for code review, adversarial review, second opinions, and write-capable rescue/fix tasks — respecting the user's configured provider and model.",
+      "version": "1.0.0",
+      "author": {
+        "name": "yamlcrew",
+        "url": "https://github.com/yamlcrew/skills"
+      },
+      "source": "./plugins/pi-agent-cc",
+      "category": "development"
     }
   ]
 }

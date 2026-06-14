@@ -13,7 +13,8 @@
       "title": "AI Agents & Tooling",
       "description": "Skills for delegating to and orchestrating other AI agents and CLIs",
       "skills": [
-        "opencode-agent-cc"
+        "opencode-agent-cc",
+        "pi-agent-cc"
       ]
     }
   ]
