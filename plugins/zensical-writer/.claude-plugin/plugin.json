@@ -1,0 +1,12 @@
+{
+  "name": "zensical-writer",
+  "description": "Senior technical writer and engineer for Zensical, the static site generator by the Material for MkDocs team — scaffolds, configures, and authors documentation sites.",
+  "version": "1.0.0",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}

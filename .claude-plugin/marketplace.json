@@ -20,6 +20,17 @@
       "category": "development"
     },
     {
+      "name": "zensical-writer",
+      "description": "Senior technical writer and engineer for Zensical, the static site generator by the Material for MkDocs team — scaffolds, configures, and authors documentation sites.",
+      "version": "1.0.0",
+      "author": {
+        "name": "yamlcrew",
+        "url": "https://github.com/yamlcrew/skills"
+      },
+      "source": "./plugins/zensical-writer",
+      "category": "development"
+    },
+    {
       "name": "opencode-agent-cc",
       "description": "Run the headless OpenCode CLI from Claude Code for code review, adversarial review, second opinions, and write-capable rescue/fix tasks — respecting the user's configured provider and model.",
       "version": "1.0.0",
