@@ -17,6 +17,13 @@
         "opencode-agent-cc",
         "pi-agent-cc"
       ]
+    },
+    {
+      "title": "Code Quality & Simplicity",
+      "description": "Skills that keep code minimal — fighting over-engineering, bloat, and unnecessary abstractions",
+      "skills": [
+        "lazy-senior-dev"
+      ]
     }
   ]
 }

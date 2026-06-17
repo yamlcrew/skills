@@ -51,6 +51,17 @@
       },
       "source": "./plugins/pi-agent-cc",
       "category": "development"
+    },
+    {
+      "name": "lazy-senior-dev",
+      "description": "Lazy senior dev mode. Forces the simplest, shortest solution that actually works: YAGNI, stdlib first, no unrequested abstractions. Activates on the /lazy-senior-dev:* commands or when its description matches — no always-on session hooks.",
+      "version": "1.0.0",
+      "author": {
+        "name": "yamlcrew",
+        "url": "https://github.com/yamlcrew/skills"
+      },
+      "source": "./plugins/lazy-senior-dev",
+      "category": "productivity"
     }
   ]
 }
