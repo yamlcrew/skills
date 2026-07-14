@@ -1,0 +1,12 @@
+{
+  "name": "effect-ts",
+  "description": "Senior engineer for Effect (Effect-TS), the typed functional TypeScript framework — services and layers, typed errors, Schema, concurrency, streams, testing, SQL, and ecosystem integrations.",
+  "version": "1.0.0",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}
