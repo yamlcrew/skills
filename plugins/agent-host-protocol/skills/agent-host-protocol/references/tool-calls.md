@@ -49,7 +49,7 @@ already resolved") present on `running`, `auth-required`, `pending-result-confir
 
 ## `contributor` — who owns the call
 
-Set on `chat/toolCallStart`, a `ToolCallContributor`:
+`chat/toolCallStart` carries `toolName` (internal name), `displayName` (human-readable), optional `intention` (what the invocation intends to do), and `contributor?`. `contributor` is a `ToolCallContributor`:
 - `{ kind: 'client', clientId }` → a **client-provided tool**; the owning client executes it.
 - `{ kind: 'mcp', customizationId }` → contributed by an MCP server (`McpServerCustomization.id`); render its
   name/icon. Only MCP contributors can enter `auth-required`.
@@ -80,7 +80,10 @@ The `content?` on `running` / `pending-result-confirmation` / `completed` (and s
 | `ToolResultResourceContent` | extends `ContentRef` — large content fetched by URI |
 | `ToolResultFileEditContent` | extends `FileEdit` — a file change produced by the tool |
 | `ToolResultTerminalContent` | `{ resource: URI (terminal), title?, isPty?, result?: ToolResultTerminalCommandResult { exitCode?, preview?, previewTruncated? } }` |
-| `ToolResultSubagentContent` | `{ resource: URI (worker chat), title?, name?, description? }` — the forward edge to a tool-spawned worker chat (mirrors that chat's `origin.kind: 'tool'`) |
+| `ToolResultSubagentContent` | `{ resource: URI (worker chat), title?, agentName?, description? }` — the forward edge to a tool-spawned worker chat (mirrors that chat's `origin.kind: 'tool'`) |
+
+The result carried by `chat/toolCallComplete` is a **`ToolCallResult`**:
+`{ success: boolean, pastTenseMessage: StringOrMarkdown, content?: ToolResultContent[], structuredContent?: Record<string,unknown> (mirrors MCP CallToolResult.structuredContent), error?: { message, code? } }`.
 
 ## Confirmation flow
 
@@ -123,8 +126,8 @@ deny → `cancelled` with `reason: 'result-denied'`).
 ## Mid-execution re-confirmation
 
 A `running` tool needing more approval (e.g. a shell permission) gets another `chat/toolCallReady` **without**
-`confirmed`, transitioning `running → pending-confirmation` (updating `invocationMessage`/`_meta`). Resolve with
-the normal `chat/toolCallConfirmed` flow.
+`confirmed`, transitioning `running → pending-confirmation` (updating `invocationMessage`, an optional
+`confirmationTitle`, and `_meta`). Resolve with the normal `chat/toolCallConfirmed` flow.
 
 ## Mid-execution MCP authentication (`auth-required`)
 
