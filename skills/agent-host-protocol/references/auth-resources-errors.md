@@ -56,7 +56,10 @@ usage) for delivery — over JSON-RPC, not HTTP.
 
 `required` (default `true`): `true` = the agent can't function unauthenticated (host SHOULD return `AuthRequired`
 `-32007`); `false` = works without auth but MAY offer enhanced capabilities. Absent `protectedResources` (or
-empty) = no auth needed. Metadata arrives via the root snapshot + `root/agentsChanged`.
+empty) = no auth needed. Metadata arrives via the root snapshot + `root/agentsChanged`. `ProtectedResourceMetadata`
+also carries the other standard RFC 9728 optional fields: `jwks_uri`, `bearer_methods_supported`,
+`resource_documentation`, `resource_policy_uri`, `resource_tos_uri`, `resource_signing_alg_values_supported`,
+`resource_encryption_alg_values_supported`, `resource_encryption_enc_values_supported`.
 
 **Token delivery — `authenticate`:**
 
@@ -105,6 +108,19 @@ session-local). They gate access through a permission flow:
 - **`resourceRequest`** — negotiate a permission grant/revocation. When access is denied, the receiver returns
   `PermissionDenied` (`-32009`), whose `data` MAY be `PermissionDeniedErrorData { request?: ResourceRequestParams }`
   advertising the access that, if granted via `resourceRequest`, would unlock the operation.
+
+Param/result field shapes (all extend `BaseParams` → carry `channel`; `encoding` is `ContentEncoding` =
+`'base64' | 'utf-8'`):
+
+| Command | Params | Result |
+|---|---|---|
+| `resourceRead` | `{ uri, encoding? }` | `{ data, encoding, contentType? }` |
+| `resourceWrite` | `{ uri, data, encoding, contentType?, createOnly?, mode?, position?, ifMatch? }` | `{}` |
+| `resourceList` | `{ uri }` | `{ entries }` |
+| `resourceResolve` | `{ uri, followSymlinks? }` | `{ uri, type, size?, mtime?, ctime?, contentType?, etag? }` |
+| `resourceCopy` / `resourceMove` | `{ source, destination, failIfExists? }` | `{}` |
+| `resourceDelete` / `resourceMkdir` | `{ uri }` | `{}` |
+| `resourceRequest` | `{ uri, read?, write? }` | grant/deny result |
 
 ### Resource watches
 
