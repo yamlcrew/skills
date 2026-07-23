@@ -31,6 +31,13 @@
       "skills": [
         "lazy-senior-dev"
       ]
+    },
+    {
+      "title": "Protocols & Standards",
+      "description": "Reference skills for wire protocols, specifications, and standards",
+      "skills": [
+        "agent-host-protocol"
+      ]
     }
   ]
 }

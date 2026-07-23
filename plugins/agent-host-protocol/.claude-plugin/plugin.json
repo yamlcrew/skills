@@ -1,0 +1,12 @@
+{
+  "name": "agent-host-protocol",
+  "description": "Reference for the Agent Host Protocol (AHP) — the JSON-RPC, channel-based state-sync protocol for multi-client AI agent sessions — covering channels, actions, reducers, write-ahead reconciliation, tool calls, and authentication.",
+  "version": "1.0.0",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}
