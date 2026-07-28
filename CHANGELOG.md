@@ -61,6 +61,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Slash commands: `review`, `adversarial-review` (read-only, via the `plan` agent), `rescue` (write-capable), `status`, and `cancel`.
   - `scripts/opencode-info.mjs` — secret-safe Node detector reporting opencode location, version, paths, configured default model, providers (baseURL only), models, and MCP servers.
   - `prompts/adversarial-review.md` and `prompts/rescue.md` — portable prompt templates.
+  - `scripts/opencode-task.mjs` — async task CLI built on the OpenCode **SDK** (`@opencode-ai/sdk`) and a managed headless server. Fire-and-forget delegation over sessions: `run` (async, or `--wait`), `status`/`list` (live RUNNING/done detection via `session.messages`), `wait`, `result`, `summary` (generated), `cancel`, plus `serve`/`stop` lifecycle. The server is the single source of truth (no stale local state); SDK auto-resolved from global `node_modules` via `file://` (ESM ignores `NODE_PATH`).
+  - Slash command `task` — routes the async task CLI (`run`/`status`/`wait`/`result`/`summary`/`list`/`cancel`) from Claude Code.
 
 ### Fixed
 

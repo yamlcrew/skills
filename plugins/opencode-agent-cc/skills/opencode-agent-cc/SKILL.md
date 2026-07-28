@@ -98,10 +98,35 @@ tasks you intend to be write-capable. A custom `--agent <name>` with fixed permi
 | Let OpenCode write/edit | `opencode run --agent build --dangerously-skip-permissions "<prompt>"` |
 | Many calls in one session | start `opencode serve`, then `opencode run --attach <url> "…"` |
 | Override model (only if user asked) | `opencode run --model <p/m> "<prompt>"` (id must be in `opencode models`) |
+| Async fire-and-forget task + status/result later | `node scripts/opencode-task.mjs run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
 
 For the full flag table, headless-server (`serve`/`--attach`) mode, model-selection notes,
 troubleshooting, and an optional reusable subagent definition, read
 `references/opencode-cli.md`.
+
+## Async task delegation (`opencode-task.mjs`)
+
+For "submit a task, come back later" delegation use the bundled **`scripts/opencode-task.mjs`** — a tiny
+async-task CLI built on the OpenCode **SDK** (`@opencode-ai/sdk`) and a headless server it manages for you.
+Every task is an OpenCode *session* on that server, so status is read live (no stale local state).
+
+Requires the SDK installed once: `npm install -g @opencode-ai/sdk`. Same model rule as above — it runs on
+the user's configured default unless you pass `--model provider/model` (only when the user asked).
+
+```bash
+node scripts/opencode-task.mjs run "Refactor src/auth.ts into smaller modules"   # async → prints a session id
+node scripts/opencode-task.mjs status <id>        # RUNNING / done (+ tokens, cost, model)
+node scripts/opencode-task.mjs wait   <id>        # block until done, then print the result
+node scripts/opencode-task.mjs result <id>        # full output of a finished task (--raw to pipe)
+node scripts/opencode-task.mjs summary <id>       # concise bullet summary of a task
+node scripts/opencode-task.mjs list               # all tasks (running first)
+node scripts/opencode-task.mjs cancel <id>        # abort a running task
+node scripts/opencode-task.mjs run --wait "…"     # foreground instead of async
+```
+
+`run` options: `--model <p/m>`, `--title <t>`, `-f <file>` (attach context; repeatable), `--dir <path>`,
+`--wait`. Use it (or the `/opencode-agent-cc:task` command) when you want to delegate and poll rather than
+block on a single `opencode run`.
 
 ## Common mistakes
 
