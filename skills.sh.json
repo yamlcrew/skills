@@ -38,6 +38,13 @@
       "skills": [
         "agent-host-protocol"
       ]
+    },
+    {
+      "title": "Dev Toolchain",
+      "description": "Skills for developer toolchains and CLIs — runtimes, package managers, and version managers.",
+      "skills": [
+        "use-nubjs"
+      ]
     }
   ]
 }
