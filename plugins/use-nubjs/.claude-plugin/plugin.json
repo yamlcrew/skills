@@ -1,0 +1,12 @@
+{
+  "name": "use-nubjs",
+  "description": "Reference and senior-engineer skill for nub (nubjs), the Rust CLI toolchain that augments Node.js — TypeScript file runner, nub run / nubx runners, the pnpm-compatible package manager, nub pm and nub node, and deployment.",
+  "version": "1.0.0",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}
