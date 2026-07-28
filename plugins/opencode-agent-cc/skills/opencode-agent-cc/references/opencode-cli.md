@@ -112,6 +112,25 @@ opencode run --attach http://127.0.0.1:4096 "Propose 3 high-impact refactors"
 `serve` defaults `--hostname` to `127.0.0.1` and `--port` to `0` (random). If a port is taken,
 pick another (`--port 4097`) and attach to the same URL.
 
+### SDK-based async tasks (no manual serve/attach)
+
+The bundled `scripts/opencode-task.mjs` wraps this same server pattern using the OpenCode SDK
+(`@opencode-ai/sdk`) and adds an async task lifecycle — submit, poll status (RUNNING/done), fetch the
+result or a generated summary, cancel. It auto-starts and reuses a `opencode serve` instance, so you don't
+manage ports yourself. Each task is a server session; status is read live. Requires `npm install -g
+@opencode-ai/sdk`. See the SKILL.md "Async task delegation" section and `/opencode-agent-cc:task`.
+
+```bash
+node scripts/opencode-task.mjs run "..."      # async → session id
+node scripts/opencode-task.mjs status <id>    # RUNNING | done
+node scripts/opencode-task.mjs wait   <id>    # block then print result
+```
+
+For programmatic control beyond fire-and-forget tasks, use the SDK directly: `createOpencodeClient({
+baseUrl: "http://127.0.0.1:4096" })` against a running server, or `createOpencode()` to start an embedded
+server+client in one process. Key calls: `session.create`, `session.promptAsync` (non-blocking),
+`session.prompt` (blocks), `session.messages`, `session.abort`.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
