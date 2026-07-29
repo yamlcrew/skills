@@ -4,7 +4,7 @@ argument-hint: '[run|status|wait|result|summary|list|cancel|server|stop] [id] [p
 allowed-tools: Bash(node:*), Bash(timeout:*), AskUserQuestion
 ---
 
-Delegate work to OpenCode **asynchronously** with the bundled `opencode-task.mjs` SDK CLI — fire a task,
+Delegate work to OpenCode **asynchronously** with the bundled `opencode-cc.mjs` SDK CLI — fire a task,
 check whether it is still processing, then read its result or a generated summary later. The headless
 server is started and reused for you; every task is an OpenCode session on it.
 
@@ -16,10 +16,10 @@ model** unless `--model provider/model` is given — do not add `--model` unless
 
 ## Routing
 
-The script lives at `${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs`. Invoke subcommands with the Bash
+The script lives at `${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs`. Invoke subcommands with the Bash
 tool (wrap long waits in `timeout`):
 
-- No args, `list`, or `status` → `node …/opencode-task.mjs list` (table of tasks) / `status <id>` (one).
+- No args, `list`, or `status` → `node …/opencode-cc.mjs list` (table of tasks) / `status <id>` (one).
 - `run "<prompt>"` → submit async; returns a session id. Options: `--wait` (foreground, prints result),
   `--model provider/model`, `--title <t>`, `-f <file>` (attach as context; repeatable), `--dir <path>`.
 - `wait <id>` → block until it finishes, then print the result (`--timeout <sec>` to bound it).
@@ -38,7 +38,7 @@ command reports it cannot start one, run `server` to see what is holding the por
 
 ## Steps
 
-1. **Prereq check:** run `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" list`. If it errors with
+1. **Prereq check:** run `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" list`. If it errors with
    the SDK install hint, relay that and stop (`npm install -g @opencode-ai/sdk`).
 2. Route by the first argument (see Routing). For `run` with no prompt, `AskUserQuestion` for what OpenCode
    should do, then build one self-contained prompt (name the exact files/functions; state read-only vs

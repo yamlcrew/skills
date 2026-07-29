@@ -98,15 +98,15 @@ tasks you intend to be write-capable. A custom `--agent <name>` with fixed permi
 | Let OpenCode write/edit | `opencode run --agent build --dangerously-skip-permissions "<prompt>"` |
 | Many calls in one session | start `opencode serve`, then `opencode run --attach <url> "…"` |
 | Override model (only if user asked) | `opencode run --model <p/m> "<prompt>"` (id must be in `opencode models`) |
-| Async fire-and-forget task + status/result later | `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
+| Async fire-and-forget task + status/result later | `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
 
 For the full flag table, headless-server (`serve`/`--attach`) mode, model-selection notes,
 troubleshooting, and an optional reusable subagent definition, read
 `references/opencode-cli.md`.
 
-## Async task delegation (`opencode-task.mjs`)
+## Async task delegation (`opencode-cc.mjs`)
 
-For "submit a task, come back later" delegation use the bundled **`scripts/opencode-task.mjs`** — a tiny
+For "submit a task, come back later" delegation use the bundled **`scripts/opencode-cc.mjs`** — a tiny
 async-task CLI built on the OpenCode **SDK** (`@opencode-ai/sdk`) and a headless server it manages for you.
 Every task is an OpenCode *session* on that server, so status is read live (no stale local state).
 
@@ -119,17 +119,17 @@ relative to this skill's own directory — a bare `scripts/…` resolves against
 directory, not the skill, and will not be found.
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "Refactor src/auth.ts into smaller modules"   # async → session id
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" status <id>        # RUNNING / done (+ tokens, cost, model)
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" wait   <id>        # block until done, then print the result
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" result <id>        # full output of a finished task (--raw to pipe)
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" summary <id>       # concise bullet summary of a task
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" list               # all tasks (running first)
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" cancel <id>        # abort a running task
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run --wait "…"     # foreground instead of async
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" server            # url, port, pid, alive?, responding?
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop              # refuses while sessions are busy
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop --force      # kill even mid-task (last resort)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "Refactor src/auth.ts into smaller modules"   # async → session id
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" status <id>        # RUNNING / done (+ tokens, cost, model)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" wait   <id>        # block until done, then print the result
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" result <id>        # full output of a finished task (--raw to pipe)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" summary <id>       # concise bullet summary of a task
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" list               # all tasks (running first)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" cancel <id>        # abort a running task
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run --wait "…"     # foreground instead of async
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" server            # url, port, pid, alive?, responding?
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop              # refuses while sessions are busy
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop --force      # kill even mid-task (last resort)
 ```
 
 **One server, ever.** The CLI manages a single `opencode serve` and records it declaratively in
