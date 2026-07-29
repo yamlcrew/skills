@@ -88,7 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
-- The `plugins/` source tree and `plugins2skills.py`. `skills/` is no longer a generated mirror of `plugins/<name>/skills/<name>/` — it is the source of truth, edited in place. There is no sync step and no build step. Every `skills/<name>/SKILL.md` and `references/*.md` path is byte-identical across the migration, so existing links and `git blame` on those paths survive.
+- The `plugins/` source tree and the `plugins2skills.py` sync script. `skills/` is the source of truth, edited in place — there is no sync step and no build step. Every `skills/<name>/SKILL.md` and `references/*.md` path is byte-identical across the migration, so existing links and `git blame` on those paths survive.
 - The `version` field from all 8 `plugin.json` files and all 8 `.claude-plugin/marketplace.json` entries. The marketplace's own top-level `version` is retained — that is the marketplace version, a different thing. Per-entry versions were redundant regardless: `plugin.json` wins when both are set.
 - The empty root `.mcp.json` (`{"mcpServers": {}}`). The repository root is not a plugin, so the file was inert.
 - A checked-in `.github/scripts/__pycache__/*.pyc`; `__pycache__/` and `*.py[cod]` are now gitignored.
@@ -105,7 +105,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Initial release of the **yamlcrew** Claude Code plugin marketplace, also published to the [skills.sh](https://skills.sh) registry.
 - **fumadocs-engineer** plugin — senior-engineer skill for the Fumadocs (Next.js) documentation framework, with reference docs covering UI components, MDX authoring, project setup, search, CLI, and framework integrations.
-- `plugins2skills.py` — sync script that generates the committed root `skills/` mirror from `plugins/`.
 - Authoring guides: `plugins.md` (plugin/manifest format) and `skills.md` (SKILL.md format).
 - `skills.sh.json` — skills.sh repo-page grouping configuration.
 - `AGENTS.md` — guidance for Agents working in this repository.
