@@ -114,19 +114,19 @@ pick another (`--port 4097`) and attach to the same URL.
 
 ### SDK-based async tasks (no manual serve/attach)
 
-The bundled `scripts/opencode-task.mjs` wraps this same server pattern using the OpenCode SDK
+The bundled `scripts/opencode-cc.mjs` wraps this same server pattern using the OpenCode SDK
 (`@opencode-ai/sdk`) and adds an async task lifecycle — submit, poll status (RUNNING/done), fetch the
 result or a generated summary, cancel. It auto-starts and reuses a `opencode serve` instance, so you don't
 manage ports yourself. Each task is a server session; status is read live. Requires `npm install -g
 @opencode-ai/sdk`. See the SKILL.md "Async task delegation" section and `/opencode-agent-cc:task`.
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "..."      # async → session id
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" status <id>    # RUNNING | done
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" wait   <id>    # block then print result
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" server         # port, pid, alive?, responding?
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop           # refuses while sessions are busy
-node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop --force   # kill even mid-task (last resort)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "..."      # async → session id
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" status <id>    # RUNNING | done
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" wait   <id>    # block then print result
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" server         # port, pid, alive?, responding?
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop           # refuses while sessions are busy
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop --force   # kill even mid-task (last resort)
 ```
 
 Unlike the manual `serve`/`--attach` flow above, the script guarantees **one** server. It records it

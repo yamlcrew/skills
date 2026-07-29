@@ -1,28 +1,36 @@
 #!/usr/bin/env node
-// opencode-task.mjs — a tiny async task CLI built on the OpenCode SDK + a headless server.
+// opencode-cc.mjs — the single CLI for the opencode-agent-cc plugin.
 //
-// Delegate work to OpenCode, check whether a task is still processing, and read its result or a
-// generated summary — all from the command line. Designed for "submit a task, come back later".
+// Two jobs in one entry point:
+//   doctor  — read-only, dependency-free environment report (is opencode set up? what will it run?)
+//   tasks   — delegate work to OpenCode asynchronously over a single managed headless server
+//
+// Delegate work, check whether a task is still processing, and read its result or a generated
+// summary — all from the command line. Designed for "submit a task, come back later".
+//
+// The SDK is loaded lazily: `doctor` and `help` work without it, which matters because a missing
+// SDK is one of the things doctor exists to diagnose.
 //
 // It talks to a running `opencode serve` instance (auto-started and reused across calls). Every
 // task is just an OpenCode *session* on that server; "status" reads the live session, so there is
 // no flaky local state to go stale.
 //
-//   opencode-task run "Refactor src/auth.ts into smaller modules"
-//   opencode-task status            # one task, or all running
-//   opencode-task wait  <id>        # block until a task finishes, then print its output
-//   opencode-task result <id>       # full assistant output of a finished task
-//   opencode-task summary <id>      # generate a concise summary of a task's outcome
-//   opencode-task list              # recent tasks
-//   opencode-task cancel <id>       # abort a running task
-//   opencode-task serve [--port P]  # start/reuse the background server explicitly
-//   opencode-task stop              # stop the server this CLI started
+//   opencode-cc doctor              # environment report (--pretty for humans)
+//   opencode-cc run "Refactor src/auth.ts into smaller modules"
+//   opencode-cc status            # one task, or all running
+//   opencode-cc wait  <id>        # block until a task finishes, then print its output
+//   opencode-cc result <id>       # full assistant output of a finished task
+//   opencode-cc summary <id>      # generate a concise summary of a task's outcome
+//   opencode-cc list              # recent tasks
+//   opencode-cc cancel <id>       # abort a running task
+//   opencode-cc serve [--port P]  # start/reuse the background server explicitly
+//   opencode-cc stop              # stop the server this CLI started
 //
-// REQUIRES the OpenCode SDK: `npm install -g @opencode-ai/sdk` (resolved automatically). The
-// `opencode` CLI must be installed and a provider authenticated. Model: defaults to the user's
-// configured model; override per-task with `--model provider/model`.
+// The task subcommands REQUIRE the OpenCode SDK: `npm install -g @opencode-ai/sdk` (resolved
+// automatically). `doctor` does not. The `opencode` CLI must be installed and a provider
+// authenticated. Model: defaults to the user's configured model; override with `--model p/m`.
 //
-// Usage: `node opencode-task.mjs <command> [options]`  (or chmod +x and call directly).
+// Usage: `node opencode-cc.mjs <command> [options]`  (or chmod +x and call directly).
 
 import { spawn, execFileSync } from "node:child_process";
 import {
@@ -58,7 +66,7 @@ const DATA_DIR =
     : join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "opencode-agent-cc"));
 // server.json is the generated, declarative record of the ONE server this CLI manages.
 // server.lock is a mutex held only while starting one, so concurrent invocations cannot each
-// spawn their own. server.pid is how the server reports its real pid back to us (see spawnServer).
+// spawn their own.
 const SERVER_FILE = join(DATA_DIR, "server.json");
 const LOCK_FILE = join(DATA_DIR, "server.lock");
 const DEFAULT_PORT = Number(process.env.OPENCODE_PORT) || 4198;
@@ -93,6 +101,7 @@ function parseFlags(args) {
     else if (a === "--timeout") flags.timeout = Number(args[++i]);
     else if (a === "--dir" || a === "-d") flags.dir = args[++i];
     else if (a === "--force") flags.force = true;
+    else if (a === "--pretty") flags.pretty = true;
     else if (a === "--dangerously-skip-permissions") flags.skipPerms = true;
     else if (a.startsWith("--")) flags[a] = args[++i]; // ignore unknown valued flags
     else positional.push(a);
@@ -525,7 +534,7 @@ async function ensureServer(flags, sdk) {
   }
 
   out.print("Timed out waiting for another invocation to start the opencode server.");
-  out.print(`Check it with: opencode-task server   (state: ${SERVER_FILE})`);
+  out.print(`Check it with: opencode-cc server   (state: ${SERVER_FILE})`);
   process.exit(1);
 }
 
@@ -537,7 +546,7 @@ function warnPortIgnored(flags, server) {
   if (url === server.url) return;
   process.stderr.write(
     `note: reusing the running server at ${server.url}; ignoring ${url}.\n` +
-      `      stop it first (opencode-task stop) to start one elsewhere.\n`
+      `      stop it first (opencode-cc stop) to start one elsewhere.\n`
   );
 }
 
@@ -717,7 +726,7 @@ async function cmdRun(sdk) {
     prompt = readFileSync(0, "utf8").trim();
   }
   if (!prompt && !flags.files?.length) {
-    out.print("Usage: opencode-task run \"<prompt>\"   (or pipe via stdin, add -f <file>)");
+    out.print("Usage: opencode-cc run \"<prompt>\"   (or pipe via stdin, add -f <file>)");
     process.exit(1);
   }
 
@@ -753,9 +762,9 @@ async function cmdRun(sdk) {
     return;
   }
   out.print(`Submitted task ${id}`);
-  out.print(`  status:  opencode-task status ${id}`);
-  out.print(`  wait:    opencode-task wait ${id}`);
-  out.print(`  result:  opencode-task result ${id}`);
+  out.print(`  status:  opencode-cc status ${id}`);
+  out.print(`  wait:    opencode-cc wait ${id}`);
+  out.print(`  result:  opencode-cc result ${id}`);
 }
 
 // Start the managed server explicitly, or report the one already there.
@@ -780,7 +789,7 @@ async function cmdServe(sdk) {
   }
 
   const { url, pid } = await startServer(flags, sdk);
-  out.print(`Started opencode server at ${url} (pid ${pid}). Stop with: opencode-task stop`);
+  out.print(`Started opencode server at ${url} (pid ${pid}). Stop with: opencode-cc stop`);
 }
 
 // Stop the recorded server and CONFIRM it is gone. The old version killed the pid, printed
@@ -795,7 +804,7 @@ async function cmdStop(sdk) {
     const stray = listenerPid(port);
     if (stray) {
       out.print(`Note: something is listening on port ${port} (pid ${stray}) that this CLI did not record.`);
-      out.print(`      Stop it yourself, or adopt it with: opencode-task server`);
+      out.print(`      Stop it yourself, or adopt it with: opencode-cc server`);
     }
     return;
   }
@@ -826,9 +835,9 @@ async function cmdStop(sdk) {
       }
       out.print("");
       out.print("Stopping now would lose the output those sessions are producing. Either:");
-      out.print("  wait for them:   opencode-task wait <id>");
-      out.print("  cancel one:      opencode-task cancel <id>");
-      out.print("  stop regardless: opencode-task stop --force");
+      out.print("  wait for them:   opencode-cc wait <id>");
+      out.print("  cancel one:      opencode-cc cancel <id>");
+      out.print("  stop regardless: opencode-cc stop --force");
       process.exit(1);
     }
   }
@@ -849,7 +858,7 @@ async function cmdStop(sdk) {
 
   if (pidAlive(pid)) {
     out.print(`Could not stop the server at ${rec.url} (pid ${pid}) — it is still running.`);
-    out.print("Keeping the record so it stays visible to `opencode-task server`.");
+    out.print("Keeping the record so it stays visible to `opencode-cc server`.");
     process.exit(1);
   }
 
@@ -936,10 +945,10 @@ async function cmdServer(sdk) {
     out.print("Nothing answers at that url. This CLI will not start one while --url/OPENCODE_URL is set.");
   } else if (!responding && rec) {
     out.print("");
-    out.print("The record points at a server that does not answer. Clear it with: opencode-task stop");
+    out.print("The record points at a server that does not answer. Clear it with: opencode-cc stop");
   } else if (!rec && !responding) {
     out.print("");
-    out.print("A server starts automatically on the next command, or explicitly with: opencode-task serve");
+    out.print("A server starts automatically on the next command, or explicitly with: opencode-cc serve");
   }
 }
 
@@ -961,7 +970,7 @@ async function cmdWait(sdk) {
   const { flags, positional } = parseFlags(rest);
   const id = positional[0];
   if (!id) {
-    out.print("Usage: opencode-task wait <id>");
+    out.print("Usage: opencode-cc wait <id>");
     process.exit(1);
   }
   const { client } = await ensureServer(flags, sdk);
@@ -999,14 +1008,14 @@ async function cmdResult(sdk) {
   const { flags, positional } = parseFlags(rest);
   const id = positional[0];
   if (!id) {
-    out.print("Usage: opencode-task result <id>");
+    out.print("Usage: opencode-cc result <id>");
     process.exit(1);
   }
   const { client } = await ensureServer(flags, sdk);
   const messages = await fetchMessages(client, id);
   const asst = lastAssistant(messages);
   if (!asst) {
-    out.print(`No assistant output yet for ${id}. Is it still running? Try: opencode-task status ${id}`);
+    out.print(`No assistant output yet for ${id}. Is it still running? Try: opencode-cc status ${id}`);
     process.exit(1);
   }
   printResult(asst, flags);
@@ -1016,7 +1025,7 @@ async function cmdSummary(sdk) {
   const { flags, positional } = parseFlags(rest);
   const id = positional[0];
   if (!id) {
-    out.print("Usage: opencode-task summary <id>");
+    out.print("Usage: opencode-cc summary <id>");
     process.exit(1);
   }
   const { client } = await ensureServer(flags, sdk);
@@ -1037,7 +1046,7 @@ async function cmdCancel(sdk) {
   const { flags, positional } = parseFlags(rest);
   const id = positional[0];
   if (!id) {
-    out.print("Usage: opencode-task cancel <id>");
+    out.print("Usage: opencode-cc cancel <id>");
     process.exit(1);
   }
   const { client } = await ensureServer(flags, sdk);
@@ -1050,9 +1059,14 @@ async function cmdCancel(sdk) {
 }
 
 async function cmdHelp() {
-  out.print(`opencode-task — delegate tasks to OpenCode and check them later
+  out.print(`opencode-cc — one CLI for the opencode-agent-cc plugin
 
 Commands:
+  doctor                    Environment report: opencode binary + version, configured default and
+                            small model, providers (baseURL only), available models, MCP servers,
+                            the managed server, and live opencode processes. Never prints secrets.
+                            Works WITHOUT the SDK — reach for it first when something is broken.
+    --pretty                Human-readable text instead of JSON.
   run "<prompt>"            Submit a task asynchronously (returns a session id).
     --wait / -w             Run in the foreground; print output when done.
     --model provider/model  Override the configured default model.
@@ -1092,6 +1106,202 @@ Server (exactly one, ever):
   or records anything. Override the managed port with --port / OPENCODE_PORT.
 
 Global flags: --json (machine-readable output). Requires: npm i -g @opencode-ai/sdk`);
+}
+
+// --- doctor: environment report (no SDK, no server) -------------------------
+// Answers "is opencode set up, and what will it run?" straight from the CLI, so it works when the
+// SDK is missing or no server is up. Everything here is read-only.
+//
+// SECRET SAFETY: `opencode debug config` contains plaintext API keys (provider.*.options.apiKey)
+// and MCP auth (mcp.*.headers.Authorization / .environment / credentials in .url). This NEVER emits
+// those — output is built field-by-field from an allowlist; raw config subtrees are never
+// serialized. Verify with:  opencode-cc doctor | grep -iE 'apikey|authorization|bearer'
+function sh(cmd, cmdArgs, timeout = 8000) {
+  try {
+    return execFileSync(cmd, cmdArgs, {
+      encoding: "utf8",
+      timeout,
+      stdio: ["ignore", "pipe", "ignore"],
+      ...(IS_WINDOWS ? { shell: true } : {}),
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+const safeHost = (u) => {
+  try {
+    return new URL(u).host || null;
+  } catch {
+    return null;
+  }
+};
+const baseName = (p) => p.split(/[\\/]/).pop() || p;
+
+// Live `opencode` processes. POSIX gets the full command line from ps; Windows has no equivalent in
+// tasklist, so it reports image name + pid only. Both branches matter: `ps` and `which` do not
+// exist on Windows, so a POSIX-only implementation reports nothing there at all.
+function runningOpencode() {
+  if (IS_WINDOWS) {
+    const raw = sh("tasklist", ["/FI", "IMAGENAME eq opencode.exe", "/FO", "CSV", "/NH"]);
+    if (!raw) return null;
+    const found = [];
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^"([^"]+)","(\d+)"/);
+      if (m) found.push({ pid: Number(m[2]), etime: null, cmd: m[1] });
+    }
+    return found;
+  }
+  const raw = sh("ps", ["-eo", "pid,etime,command"]);
+  if (!raw) return null;
+  const found = [];
+  const self = String(process.pid);
+  for (const line of raw.split("\n").slice(1)) {
+    const m = line.match(/^\s*(\d+)\s+(\S+)\s+(.*)$/);
+    if (!m) continue;
+    const [, pid, etime, cmd] = m;
+    if (pid === self || cmd.includes("opencode-cc.mjs") || /\bgrep\b/.test(cmd)) continue;
+    if (!(/(^|\/)opencode\b/.test(cmd) && /\bopencode\b.*\b(run|serve)\b/.test(cmd))) continue;
+    found.push({ pid: Number(pid), etime, cmd: cmd.length > 120 ? cmd.slice(0, 117) + "..." : cmd });
+  }
+  return found;
+}
+
+function collectDoctor() {
+  const binary = sh(IS_WINDOWS ? "where" : "which", ["opencode"])?.split(/\r?\n/)[0] || null;
+  const version = sh("opencode", ["--version"]);
+  if (!binary && version === null) {
+    return {
+      ok: false,
+      installed: false,
+      error: "opencode CLI not found on PATH",
+      hint: "Install it (e.g. npm install -g opencode-ai) and configure a provider; this plugin assumes opencode is already set up.",
+    };
+  }
+
+  const warnings = [];
+  const paths = {};
+  const rawPaths = sh("opencode", ["debug", "paths"]);
+  if (rawPaths) {
+    for (const line of rawPaths.split(/\r?\n/)) {
+      const m = line.match(/^(\S+)\s+(.+?)\s*$/);
+      if (m) paths[m[1]] = m[2];
+    }
+  } else warnings.push("could not read `opencode debug paths`");
+
+  let defaultModel = null;
+  let smallModel = null;
+  const providers = [];
+  const mcpServers = [];
+  let configParseError = null;
+  const rawCfg = sh("opencode", ["debug", "config"]);
+  if (rawCfg) {
+    let cfg = null;
+    try {
+      cfg = JSON.parse(rawCfg);
+    } catch (e) {
+      configParseError = String(e?.message ?? e);
+    }
+    if (cfg && typeof cfg === "object") {
+      defaultModel = typeof cfg.model === "string" ? cfg.model : null;
+      smallModel = typeof cfg.small_model === "string" ? cfg.small_model : null;
+      for (const [id, v] of Object.entries(cfg.provider ?? {})) {
+        const opts = v && typeof v === "object" ? v.options : null;
+        providers.push({
+          id,
+          npm: typeof v?.npm === "string" ? v.npm : null,
+          // baseURL is safe; apiKey (its sibling) is deliberately never read.
+          baseURL: typeof opts?.baseURL === "string" ? opts.baseURL : null,
+        });
+      }
+      for (const [name, v] of Object.entries(cfg.mcp ?? {})) {
+        const entry = { name, type: typeof v?.type === "string" ? v.type : null };
+        if (typeof v?.url === "string") entry.host = safeHost(v.url); // hostname only
+        if (v?.headers && typeof v.headers === "object") entry.hasAuthHeaders = true; // boolean only
+        if (v?.environment && typeof v.environment === "object") entry.hasEnv = true;
+        if (Array.isArray(v?.command) && v.command.length) entry.command = baseName(String(v.command[0]));
+        mcpServers.push(entry);
+      }
+    }
+  } else warnings.push("could not read `opencode debug config`");
+
+  const rawModels = sh("opencode", ["models"]);
+  const models = rawModels ? rawModels.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
+  if (defaultModel && models.length && !models.includes(defaultModel)) {
+    warnings.push(
+      `configured model "${defaultModel}" is not in \`opencode models\` — tasks on it produce no output ` +
+        "(an unresolvable model is not reported as an error)"
+    );
+  }
+
+  // The managed server, from the same state this CLI uses everywhere else.
+  const rec = readServer();
+  const managed = rec
+    ? {
+        url: rec.url,
+        port: rec.port,
+        pid: listenerPid(rec.port) ?? rec.pid,
+        pidAlive: pidAlive(listenerPid(rec.port) ?? rec.pid),
+        ownedByCli: rec.managed !== false,
+      }
+    : null;
+
+  return {
+    ok: true,
+    installed: true,
+    platform: process.platform,
+    binary,
+    version,
+    paths,
+    defaultModel,
+    smallModel,
+    providers,
+    models,
+    mcpServers,
+    mcpWarning:
+      "OpenCode auto-loads these MCP servers on every run and may defer to one instead of answering. " +
+      "For pure-analysis runs, instruct it to answer directly and not call tools; always wrap runs in `timeout`.",
+    managedServer: managed,
+    running: runningOpencode(),
+    stateDir: DATA_DIR,
+    warnings,
+    configParseError,
+  };
+}
+
+async function cmdDoctor() {
+  const { flags } = parseFlags(rest);
+  const d = collectDoctor();
+  // Default to JSON (this is a machine-read report); --pretty for humans.
+  if (!flags.pretty) {
+    out.emit(d);
+    return;
+  }
+  if (!d.installed) {
+    out.print("OpenCode: NOT installed / not on PATH.");
+    if (d.hint) out.print("  " + d.hint);
+    return;
+  }
+  out.print(`OpenCode ${d.version || "?"}  (${d.binary || "?"})  [${d.platform}]`);
+  out.print(`Default model: ${d.defaultModel || "(none configured)"}`);
+  if (d.smallModel) out.print(`Small model:   ${d.smallModel}`);
+  if (d.providers.length) out.print("Providers:     " + d.providers.map((p) => p.id).join(", "));
+  if (d.models.length) out.print(`Models:        ${d.models.length} available`);
+  if (d.mcpServers.length) out.print("MCP servers:   " + d.mcpServers.map((m) => m.name).join(", "));
+  if (d.managedServer) {
+    const m = d.managedServer;
+    out.print(`Managed server: ${m.url} (pid ${m.pid ?? "-"}${m.pidAlive ? ", alive" : ", DEAD"})`);
+  } else {
+    out.print("Managed server: none recorded");
+  }
+  if (d.running) {
+    out.print(`Running opencode processes: ${d.running.length}`);
+    for (const r of d.running) out.print(`  [${r.pid}]${r.etime ? " " + r.etime : ""}  ${r.cmd}`);
+  } else {
+    out.print("Running opencode processes: (could not enumerate)");
+  }
+  out.print(`State dir:     ${d.stateDir}`);
+  if (d.warnings.length) for (const w of d.warnings) out.print(`Warning: ${w}`);
 }
 
 // --- printing --------------------------------------------------------------
@@ -1139,11 +1349,11 @@ async function printOne(client, id, flags) {
     const text = extractText(message);
     out.print("  result:");
     out.print(indent(text.slice(0, 500) + (text.length > 500 ? "\n  …" : ""), "    "));
-    out.print(`\n  full output: opencode-task result ${id}`);
+    out.print(`\n  full output: opencode-cc result ${id}`);
   } else if (state === "error") {
     out.print(`  error: ${message?.info?.error?.message || "(see result)"}`);
   } else if (state === "running") {
-    out.print("  still processing — try: opencode-task wait " + id);
+    out.print("  still processing — try: opencode-cc wait " + id);
   } else {
     out.print("  (no messages yet)");
   }
@@ -1165,7 +1375,7 @@ async function printAll(client, flags) {
     return;
   }
   if (!rows.length) {
-    out.print("No tasks yet. Submit one with: opencode-task run \"<prompt>\"");
+    out.print("No tasks yet. Submit one with: opencode-cc run \"<prompt>\"");
     return;
   }
   out.print("ID".padEnd(34) + "STATE".padEnd(10) + "MODEL".padEnd(18) + "TOKENS".padEnd(16) + "TITLE");
@@ -1178,7 +1388,7 @@ async function printAll(client, flags) {
         truncate(r.title, 40)
     );
   }
-  out.print(`\n${rows.length} task(s). Detail: opencode-task status <id>`);
+  out.print(`\n${rows.length} task(s). Detail: opencode-cc status <id>`);
 }
 
 function printResult(message, flags) {
@@ -1227,7 +1437,11 @@ function truncate(s, n) {
 
 // --- main ------------------------------------------------------------------
 async function main() {
+  // The SDK is loaded LAZILY. `doctor` is the tool you reach for when something is broken —
+  // including a missing SDK — so it must never be gated behind loading it.
   if (command === "help" || command === "--help" || command === "-h") return cmdHelp();
+  if (command === "doctor") return cmdDoctor();
+
   const sdk = await loadSDK();
   switch (command) {
     case "stop": return cmdStop(sdk);

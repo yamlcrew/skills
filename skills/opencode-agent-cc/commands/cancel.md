@@ -13,7 +13,7 @@ Arguments: `$ARGUMENTS`
 
 1. Get the live list of opencode processes:
    ```
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-info.mjs" --running
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" doctor
    ```
 2. If no PID was given: show the `running` entries (`[pid] etime — cmd`) and ask which to cancel. If the
    list is empty, report that there is nothing to cancel and stop.
