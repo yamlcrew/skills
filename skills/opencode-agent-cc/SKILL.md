@@ -127,7 +127,21 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" summary <id>       # conc
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" list               # all tasks (running first)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" cancel <id>        # abort a running task
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run --wait "…"     # foreground instead of async
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" server            # url, port, pid, alive?, responding?
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop              # refuses while sessions are busy
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop --force      # kill even mid-task (last resort)
 ```
+
+**One server, ever.** The CLI manages a single `opencode serve` and records it declaratively in
+`server.json` under its state dir (`%LOCALAPPDATA%` on Windows, `$XDG_DATA_HOME`/`~/.local/share`
+otherwise). Concurrent invocations cannot each start one: whoever wins an atomic `server.lock`
+starts it and the rest wait. A healthy server already on the port is adopted instead of duplicated,
+and the port is never auto-incremented, so stray servers cannot pile up. Use `server` to see port /
+pid / liveness / busy sessions (`--json` for machine output) and `stop` to shut it down. `stop`
+**refuses while any session is still working** (killing mid-task loses that output) and names the
+sessions; pass `--force` to kill regardless. It verifies the process actually died before clearing
+the record. `--url` / `OPENCODE_URL` bypasses all of this and
+never spawns anything.
 
 `run` options: `--model <p/m>`, `--title <t>`, `-f <file>` (attach context; repeatable), `--dir <path>`,
 `--wait`. Use it (or the `/opencode-agent-cc:task` command) when you want to delegate and poll rather than

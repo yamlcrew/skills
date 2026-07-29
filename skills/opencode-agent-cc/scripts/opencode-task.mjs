@@ -30,6 +30,9 @@ import {
   readFileSync,
   writeFileSync,
   rmSync,
+  openSync,
+  closeSync,
+  statSync,
 } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -44,13 +47,25 @@ process.stderr?.on?.("error", (e) => {
 });
 
 // --- paths & config --------------------------------------------------------
+const IS_WINDOWS = process.platform === "win32";
+const IS_MAC = process.platform === "darwin";
+
+// Per-user state lives outside the repo: XDG on Linux/macOS, LOCALAPPDATA on Windows.
 const DATA_DIR =
   process.env.OPENCODE_TASKS_DIR ||
-  join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "opencode-agent-cc");
-// fallback to a sane home dir if XDG resolved oddly
+  (IS_WINDOWS
+    ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "opencode-agent-cc")
+    : join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "opencode-agent-cc"));
+// server.json is the generated, declarative record of the ONE server this CLI manages.
+// server.lock is a mutex held only while starting one, so concurrent invocations cannot each
+// spawn their own. server.pid is how the server reports its real pid back to us (see spawnServer).
 const SERVER_FILE = join(DATA_DIR, "server.json");
+const LOCK_FILE = join(DATA_DIR, "server.lock");
 const DEFAULT_PORT = Number(process.env.OPENCODE_PORT) || 4198;
 const DEFAULT_HOST = process.env.OPENCODE_HOST || "127.0.0.1";
+const LOCK_STALE_MS = 90_000; // a starter that holds the lock longer than this is presumed crashed
+const START_TIMEOUT_MS = 40_000;
+const HEALTH_TIMEOUT_MS = 3_000; // never block forever on a port that accepts but does not answer
 
 // --- minimal arg parsing ---------------------------------------------------
 const argv = process.argv.slice(2);
@@ -77,6 +92,7 @@ function parseFlags(args) {
     else if (a === "--host") flags.host = args[++i];
     else if (a === "--timeout") flags.timeout = Number(args[++i]);
     else if (a === "--dir" || a === "-d") flags.dir = args[++i];
+    else if (a === "--force") flags.force = true;
     else if (a === "--dangerously-skip-permissions") flags.skipPerms = true;
     else if (a.startsWith("--")) flags[a] = args[++i]; // ignore unknown valued flags
     else positional.push(a);
@@ -100,7 +116,13 @@ async function loadSDK() {
   tries.push(() => import("@opencode-ai/sdk"));
   // 2. global install, resolved to a file:// URL (ESM ignores NODE_PATH)
   tries.push(() => {
-    const root = execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
+    // On Windows npm is npm.cmd (there is no npm.exe) and Node's path search only appends
+    // .com/.exe, so this must go through a shell there or it throws ENOENT and the global SDK
+    // — the only documented install — can never be found.
+    const root = execFileSync("npm", ["root", "-g"], {
+      encoding: "utf8",
+      ...(IS_WINDOWS ? { shell: true } : {}),
+    }).trim();
     const pjPath = join(root, "@opencode-ai", "sdk", "package.json");
     const pj = JSON.parse(readFileSync(pjPath, "utf8"));
     const rel = pj.exports?.["."]?.import || pj.module || "dist/index.js";
@@ -154,77 +176,369 @@ function pidAlive(pid) {
   }
 }
 
-async function healthOk(client) {
+// A bounded check is essential: a port held by something that accepts TCP but never answers HTTP
+// (a half-dead process, an unrelated service) would otherwise hang this request — and every caller
+// waiting on it — forever.
+async function healthOk(client, timeoutMs = HEALTH_TIMEOUT_MS) {
   try {
-    const r = await client.session.list();
+    const r = await client.session.list({ signal: AbortSignal.timeout(timeoutMs) });
     return Array.isArray(r?.data ?? r);
   } catch {
     return false;
   }
 }
 
-// Resolve which URL to use. Returns { url, ours, client }.
-async function resolveServer(flags, sdk) {
-  const explicitUrl = flags?.url || process.env.OPENCODE_URL;
-  if (explicitUrl) {
-    const client = sdk.createOpencodeClient({ baseUrl: explicitUrl, throwOnError: false });
-    if (await healthOk(client)) return { url: explicitUrl, ours: false, client };
-    return { url: explicitUrl, ours: false, client, unreachable: true };
+const clientFor = (sdk, url) => sdk.createOpencodeClient({ baseUrl: url, throwOnError: false });
+const targetOf = (flags) => {
+  const host = flags?.host || DEFAULT_HOST;
+  const port = flags?.port || DEFAULT_PORT;
+  return { host, port, url: `http://${host}:${port}` };
+};
+
+// --- startup mutex ---------------------------------------------------------
+// Without this, two concurrent invocations both see "no server" and both spawn one. `wx` fails if
+// the file exists, and that check-and-create is atomic, so exactly one caller wins the race.
+let lockHeld = false;
+function acquireLock() {
+  mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    const fd = openSync(LOCK_FILE, "wx");
+    writeFileSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }, null, 2));
+    closeSync(fd);
+    lockHeld = true;
+    return true;
+  } catch (e) {
+    if (e?.code !== "EEXIST") throw e;
+    return false;
   }
-  // reuse a server we started before
+}
+// `process.exit()` skips `finally`, so a failed start would otherwise leave the lock behind. It
+// would eventually be treated as stale, but until then `server` reports a lock nobody holds.
+process.on("exit", () => {
+  if (lockHeld) {
+    try {
+      rmSync(LOCK_FILE);
+    } catch {
+      /* ignore */
+    }
+  }
+});
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, () => {
+    releaseLock();
+    process.exit(130);
+  });
+}
+function readLock() {
+  let raw;
+  try {
+    raw = readFileSync(LOCK_FILE, "utf8");
+  } catch {
+    return null; // genuinely absent
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (Number.isInteger(parsed?.pid)) return parsed;
+  } catch {
+    /* fall through */
+  }
+  // `wx` creates the file empty and the contents land a moment later, so a concurrent reader can
+  // see 0 bytes. Treating that as "no lock" would let it steal a lock somebody is mid-way through
+  // taking — two starters. With no pid to check, fall back to the file's own age.
+  try {
+    return { pid: null, at: statSync(LOCK_FILE).mtimeMs };
+  } catch {
+    return null;
+  }
+}
+function releaseLock() {
+  lockHeld = false;
+  try {
+    rmSync(LOCK_FILE);
+  } catch {
+    /* ignore */
+  }
+}
+// A lock whose holder died (or has held it absurdly long) must not wedge the CLI forever.
+function lockIsStale(lock) {
+  if (!lock) return true;
+  // Holder unknown (see readLock): judge on age alone, never on a pid we could not read.
+  if (lock.pid === null) return Date.now() - (lock.at || 0) > LOCK_STALE_MS;
+  if (!pidAlive(lock.pid)) return true;
+  return Date.now() - (lock.at || 0) > LOCK_STALE_MS;
+}
+
+// --- resolve / adopt / start ------------------------------------------------
+// Returns { url, client, pid, managed } or null.
+async function adoptRecorded(sdk) {
   const rec = readServer();
-  if (rec) {
-    const client = sdk.createOpencodeClient({ baseUrl: rec.url, throwOnError: false });
-    if (await healthOk(client)) return { url: rec.url, ours: true, client, pid: rec.pid };
-    clearServer(); // stale record
+  if (!rec?.url) return null;
+  const client = clientFor(sdk, rec.url);
+  if (await healthOk(client)) {
+    return { url: rec.url, client, pid: rec.pid, managed: rec.managed !== false };
+  }
+  // The record points at nothing that answers. If the recorded process is still alive it is
+  // probably still booting, so give it a moment before declaring the record dead.
+  if (pidAlive(rec.pid)) {
+    for (let i = 0; i < 10; i++) {
+      await sleep(1000);
+      if (await healthOk(client)) {
+        return { url: rec.url, client, pid: rec.pid, managed: rec.managed !== false };
+      }
+    }
+  }
+  clearServer();
+  return null;
+}
+
+// Which process is actually listening on the port. `spawn()` returns the pid of the launcher,
+// which for the `opencode` shim is a short-lived wrapper that exits — recording it meant `stop`
+// later killed a dead pid, reported success, and left a live server orphaned. Asking the OS who
+// owns the port is authoritative, works the same for a server we started and one we adopted, and
+// needs no shell tricks (so it behaves on Windows too).
+function listenerPid(port) {
+  const attempts = IS_WINDOWS
+    ? [["netstat", ["-ano", "-p", "tcp"]]]
+    : IS_MAC
+      ? [["lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"]]]
+      : [
+          ["ss", ["-lptnH", `sport = :${port}`]],
+          ["lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"]],
+        ];
+  for (const [cmd, args] of attempts) {
+    try {
+      const text = execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const pid = parseListenerPid(text, port);
+      if (pid) return pid;
+    } catch {
+      /* tool missing or no match — try the next one */
+    }
   }
   return null;
 }
 
-// Start a background `opencode serve` and remember it. Returns { url, client, pid }.
-async function startServer(flags, sdk) {
-  mkdirSync(DATA_DIR, { recursive: true });
-  const host = flags?.host || DEFAULT_HOST;
-  const basePort = flags?.port || DEFAULT_PORT;
-  // try the requested port, then a few above it in case it's taken
-  const tryStart = (p) =>
-    new Promise((resolve) => {
-      const child = spawn(
-        "opencode",
-        ["serve", "--hostname", host, "--port", String(p)],
-        { detached: true, stdio: ["ignore", "ignore", "ignore"] }
-      );
-      child.unref();
-      const pid = child.pid;
-      const url = `http://${host}:${p}`;
-      // poll health up to ~25s
-      let tries = 0;
-      const iv = setInterval(async () => {
-        tries++;
-        const client = sdk.createOpencodeClient({ baseUrl: url, throwOnError: false });
-        if (await healthOk(client)) {
-          clearInterval(iv);
-          writeServer({ pid, url, port: p, host, startedAt: Date.now() });
-          resolve({ url, client, pid });
-        } else if (tries > 25) {
-          clearInterval(iv);
-          resolve({ url, client, pid, failed: true });
-        }
-      }, 1000);
-    });
-
-  for (let p = basePort; p < basePort + 10; p++) {
-    const r = await tryStart(p);
-    if (!r.failed) return r;
+// Output shapes handled:
+//   linux   ss -lptnH   LISTEN 0 511 127.0.0.1:4198 0.0.0.0:* users:(("opencode",pid=1234,fd=20))
+//   macOS   lsof -t     a bare pid per line
+//   windows netstat -ano  TCP  127.0.0.1:4198  0.0.0.0:0  LISTENING  4321
+// The Windows branch keys on the LOCAL ADDRESS column, not the state word: netstat localises the
+// state ("ABHÖREN", "NASŁUCHIWANIE", …), so matching /LISTENING/ silently finds nothing outside
+// English installs. Keying on the local address is also what makes it reject the two look-alikes —
+// a longer port ending in the same digits (`:14198`), and our port appearing as the FOREIGN address
+// of an established connection. Any row whose LOCAL address is our port belongs to the server
+// anyway, whether it is the listening socket or an accepted connection on it.
+function parseListenerPid(text, port) {
+  const ss = text.match(/pid=(\d+)/); // ss: users:(("opencode",pid=1234,fd=20))
+  if (ss) return Number(ss[1]);
+  for (const line of text.split(/\r?\n/)) {
+    if (IS_WINDOWS) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 4 || !/^(TCP|UDP)$/i.test(parts[0])) continue;
+      if (!parts[1].endsWith(`:${port}`)) continue;
+      const n = Number(parts[parts.length - 1]);
+      if (Number.isInteger(n) && n > 0) return n;
+    } else {
+      const n = Number(line.trim()); // lsof -t prints bare pids
+      if (Number.isInteger(n) && n > 0) return n;
+    }
   }
-  out.print("Could not start an opencode server. Run it manually and pass --url:\n  opencode serve --port 4096\n  node opencode-task.mjs run --url http://127.0.0.1:4096 \"...\"");
+  return null;
+}
+
+// `opencode` on Windows is a .cmd shim, which Node cannot exec without a shell. Because that means
+// the arguments pass through a shell there, host/port are validated before use.
+function spawnServer(host, port) {
+  const args = ["serve", "--hostname", host, "--port", String(port)];
+  const opts = { detached: true, stdio: ["ignore", "ignore", "ignore"] };
+  const child = IS_WINDOWS
+    ? spawn("opencode", args, { ...opts, shell: true, windowsHide: true })
+    : spawn("opencode", args, opts);
+  child.unref();
+  return child;
+}
+
+function assertSafeTarget(host, port) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    out.print(`Invalid port: ${port}. Expected an integer between 1 and 65535.`);
+    process.exit(1);
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(host)) {
+    out.print(`Invalid host: ${host}. Expected a plain hostname or IP address.`);
+    process.exit(1);
+  }
+}
+
+// Terminate a server. Only group-kills a server we started ourselves: an adopted server may share
+// its process group with the user's shell, and killing that group would take the shell down too.
+function killServer(rec, force) {
+  const signal = force ? "SIGKILL" : "SIGTERM";
+  if (IS_WINDOWS) {
+    const args = ["/PID", String(rec.pid), "/T"];
+    if (force) args.push("/F");
+    try {
+      execFileSync("taskkill", args, { stdio: "ignore" });
+    } catch {
+      /* already gone */
+    }
+    return;
+  }
+  if (rec.pgid && rec.managed !== false) {
+    try {
+      process.kill(-rec.pgid, signal);
+    } catch {
+      /* group already gone */
+    }
+  }
+  try {
+    process.kill(rec.pid, signal);
+  } catch {
+    /* already gone */
+  }
+}
+
+// Start exactly one server on the requested port. Deliberately does NOT scan for a free port:
+// drifting to the next one is how a machine ends up with a pile of untracked servers.
+async function startServer(flags, sdk) {
+  const { host, port, url } = targetOf(flags);
+  assertSafeTarget(host, port);
+  const client = clientFor(sdk, url);
+
+  // Someone else's server already listening there? Adopt it rather than add another.
+  if (await healthOk(client)) {
+    const rec = { pid: listenerPid(port), pgid: null, url, port, host, startedAt: null, managed: false };
+    writeServer(rec);
+    return { ...rec, client };
+  }
+
+  // Who (if anyone) already held the port. Needed for the cleanup below: resolving the victim from
+  // the port alone would target THIS process — the very thing that made us fail — and SIGTERM an
+  // innocent bystander (`run --port 3000` would kill a dev server on 3000).
+  const preexisting = listenerPid(port);
+
+  const child = spawnServer(host, port);
+  const deadline = Date.now() + START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await sleep(1000);
+    if (await healthOk(client)) {
+      // detached:true puts the child in its own process group, so pgid === child.pid.
+      const rec = {
+        pid: listenerPid(port) ?? child.pid,
+        pgid: child.pid,
+        url,
+        port,
+        host,
+        startedAt: Date.now(),
+        managed: true,
+      };
+      writeServer(rec);
+      return { ...rec, client };
+    }
+  }
+
+  // Clean up only what WE started. If the port owner is unchanged it is not ours — leave it alone.
+  const owner = listenerPid(port);
+  const ourPid = owner && owner !== preexisting ? owner : child.pid;
+  let cleanedUp = false;
+  if (ourPid && ourPid !== preexisting) {
+    killServer({ pid: ourPid, pgid: child.pid, managed: true }, false);
+    for (let i = 0; i < 6 && pidAlive(ourPid); i++) await sleep(500);
+    if (pidAlive(ourPid)) killServer({ pid: ourPid, pgid: child.pid, managed: true }, true);
+    for (let i = 0; i < 6 && pidAlive(ourPid); i++) await sleep(500);
+    cleanedUp = !pidAlive(ourPid);
+  }
+
+  out.print(`Could not start an opencode server on ${url}.`);
+  out.print(`  Nothing healthy answered there within ${Math.round(START_TIMEOUT_MS / 1000)}s.`);
+  if (cleanedUp) out.print(`  The process we started was stopped again rather than left behind.`);
+  else if (ourPid && pidAlive(ourPid)) out.print(`  Warning: pid ${ourPid} that we started is still alive — stop it manually.`);
+  if (preexisting) out.print(`  Port ${port} was already held by pid ${preexisting}, which was left untouched.`);
+  out.print("");
+  out.print("Most likely the port is taken by something that is not an opencode server. Either:");
+  out.print(`  free port ${port}, or`);
+  out.print("  pick another:      --port <n>   (or OPENCODE_PORT)");
+  out.print("  use your own:      --url http://127.0.0.1:4096   (or OPENCODE_URL)");
   process.exit(1);
 }
 
+// Resolve which URL to use, honouring an explicit --url/OPENCODE_URL. Returns
+// { url, client, pid, managed, external } or, for an unreachable explicit url, { unreachable }.
+async function resolveServer(flags, sdk) {
+  const explicitUrl = flags?.url || process.env.OPENCODE_URL;
+  if (explicitUrl) {
+    const client = clientFor(sdk, explicitUrl);
+    if (await healthOk(client)) return { url: explicitUrl, client, external: true, managed: false };
+    return { url: explicitUrl, client, external: true, managed: false, unreachable: true };
+  }
+  return adoptRecorded(sdk);
+}
+
 async function ensureServer(flags, sdk) {
-  const existing = await resolveServer(flags, sdk);
-  if (existing && !existing.unreachable) return existing;
-  return startServer(flags, sdk);
+  const explicitUrl = flags?.url || process.env.OPENCODE_URL;
+  if (explicitUrl) {
+    const existing = await resolveServer(flags, sdk);
+    if (existing?.unreachable) {
+      out.print(`No opencode server answering at ${explicitUrl}.`);
+      out.print("Start one with `opencode serve`, or drop --url/OPENCODE_URL to let this CLI manage one.");
+      process.exit(1);
+    }
+    return existing;
+  }
+
+  const existing = await adoptRecorded(sdk);
+  if (existing) {
+    warnPortIgnored(flags, existing);
+    return existing;
+  }
+
+  // Only one invocation may start a server; the rest wait for the winner to publish it. Bounded by
+  // an overall deadline rather than a retry count — counting attempts meant that stealing one stale
+  // lock used up an attempt and the next iteration reported a timeout that had not happened.
+  const giveUpAt = Date.now() + START_TIMEOUT_MS * 2;
+  while (Date.now() < giveUpAt) {
+    if (acquireLock()) {
+      try {
+        // Double-checked: another invocation may have finished between our check and the lock.
+        const now = await adoptRecorded(sdk);
+        if (now) {
+          warnPortIgnored(flags, now);
+          return now;
+        }
+        return await startServer(flags, sdk);
+      } finally {
+        releaseLock();
+      }
+    }
+
+    if (lockIsStale(readLock())) {
+      releaseLock(); // holder is gone — drop it and try to take it on the next pass
+      await sleep(100); // don't hot-spin if another process keeps recreating it
+      continue;
+    }
+
+    // Someone is starting one right now — wait for them rather than racing.
+    await sleep(1000);
+    const ready = await adoptRecorded(sdk);
+    if (ready) {
+      warnPortIgnored(flags, ready);
+      return ready;
+    }
+  }
+
+  out.print("Timed out waiting for another invocation to start the opencode server.");
+  out.print(`Check it with: opencode-task server   (state: ${SERVER_FILE})`);
+  process.exit(1);
+}
+
+// Single-instance means an explicit --port/--host cannot be honoured while a server is already up.
+// Say so instead of silently ignoring it.
+function warnPortIgnored(flags, server) {
+  if (!flags?.port && !flags?.host) return;
+  const { url } = targetOf(flags);
+  if (url === server.url) return;
+  process.stderr.write(
+    `note: reusing the running server at ${server.url}; ignoring ${url}.\n` +
+      `      stop it first (opencode-task stop) to start one elsewhere.\n`
+  );
 }
 
 // --- opencode session helpers ----------------------------------------------
@@ -270,6 +584,33 @@ function classify(messages) {
 async function fetchMessages(client, id) {
   const r = await client.session.messages({ path: { id } });
   return dataOf(r) || [];
+}
+
+// Sessions the server is actively working on. One call: the status map only carries sessions that
+// are not idle. Returns null when it cannot be determined (server unreachable, old server, …) so
+// callers can distinguish "nothing running" from "don't know".
+async function activeSessions(client) {
+  try {
+    const r = await client.session.status({ signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
+    const map = dataOf(r);
+    if (!map || typeof map !== "object") return null;
+    return Object.entries(map)
+      .filter(([, s]) => s?.type === "busy" || s?.type === "retry")
+      .map(([id, s]) => ({ id, state: s.type }));
+  } catch {
+    return null;
+  }
+}
+
+async function titlesFor(client, ids) {
+  const titles = new Map();
+  try {
+    const list = dataOf(await client.session.list()) || [];
+    for (const s of list) if (ids.includes(s.id)) titles.set(s.id, s.title || "");
+  } catch {
+    /* titles are a nicety, not required */
+  }
+  return titles;
 }
 
 // build the prompt body, optionally attaching files as text context
@@ -417,31 +758,189 @@ async function cmdRun(sdk) {
   out.print(`  result:  opencode-task result ${id}`);
 }
 
-// internal: keep a foreground server alive (used by `serve` when not already running)
+// Start the managed server explicitly, or report the one already there.
 async function cmdServe(sdk) {
   const { flags } = parseFlags(rest);
+  const explicitUrl = flags.url || process.env.OPENCODE_URL;
   const existing = await resolveServer(flags, sdk);
+
   if (existing && !existing.unreachable) {
-    out.print(`Server already running at ${existing.url}${existing.ours ? " (managed by this CLI)" : ""}`);
+    // `managed` — not the never-assigned `ours` the old line read, which made this suffix dead code.
+    const own = existing.external ? " (external, via --url/OPENCODE_URL)" : existing.managed ? " (started by this CLI)" : " (adopted)";
+    out.print(`Server already running at ${existing.url}${own}`);
     return;
   }
+
+  // An explicit url that does not answer must not silently become "start one somewhere else".
+  if (explicitUrl) {
+    out.print(`No opencode server answering at ${explicitUrl}.`);
+    out.print("This CLI will not start a server while --url/OPENCODE_URL is set — it does not own that one.");
+    out.print("Start it yourself (`opencode serve`), or drop --url/OPENCODE_URL to let this CLI manage one.");
+    process.exit(1);
+  }
+
   const { url, pid } = await startServer(flags, sdk);
   out.print(`Started opencode server at ${url} (pid ${pid}). Stop with: opencode-task stop`);
 }
 
-async function cmdStop() {
+// Stop the recorded server and CONFIRM it is gone. The old version killed the pid, printed
+// "Stopped", and deleted the record unconditionally — so a failed kill silently orphaned a live
+// server that the CLI could then never see or stop again.
+async function cmdStop(sdk) {
+  const { flags } = parseFlags(rest);
   const rec = readServer();
   if (!rec) {
-    out.print("No server managed by this CLI to stop.");
+    out.print("No server recorded by this CLI.");
+    const { port } = targetOf(flags);
+    const stray = listenerPid(port);
+    if (stray) {
+      out.print(`Note: something is listening on port ${port} (pid ${stray}) that this CLI did not record.`);
+      out.print(`      Stop it yourself, or adopt it with: opencode-task server`);
+    }
     return;
   }
-  if (pidAlive(rec.pid)) {
-    try {
-      process.kill(rec.pid);
-    } catch {}
+
+  // Re-resolve the pid from the port: the recorded one may be stale after a restart.
+  const pid = listenerPid(rec.port) ?? rec.pid;
+  if (!pid || !pidAlive(pid)) {
+    clearServer();
+    out.print(`Server ${rec.url} was already gone; cleared the record.`);
+    return;
   }
+
+  // Don't yank the server out from under work in flight. Killing it mid-task loses that task's
+  // output: the session survives on disk but the assistant message it was producing does not.
+  if (!flags.force) {
+    const client = clientFor(sdk, rec.url);
+    const active = await activeSessions(client);
+    if (active === null) {
+      out.print(`Warning: could not check whether ${rec.url} is busy (it did not answer in time).`);
+      out.print("Stopping anyway. Use `server` to inspect it first if that was unexpected.");
+    } else if (active.length) {
+      const titles = await titlesFor(client, active.map((a) => a.id));
+      out.print(`Refusing to stop ${rec.url}: ${active.length} session(s) still working.`);
+      out.print("");
+      for (const a of active) {
+        const t = titles.get(a.id);
+        out.print(`  ${a.id}  [${a.state}]${t ? `  ${truncate(t, 48)}` : ""}`);
+      }
+      out.print("");
+      out.print("Stopping now would lose the output those sessions are producing. Either:");
+      out.print("  wait for them:   opencode-task wait <id>");
+      out.print("  cancel one:      opencode-task cancel <id>");
+      out.print("  stop regardless: opencode-task stop --force");
+      process.exit(1);
+    }
+  }
+
+  const target = { ...rec, pid };
+  killServer(target, false);
+  for (let i = 0; i < 10; i++) {
+    await sleep(500);
+    if (!pidAlive(pid)) break;
+  }
+  if (pidAlive(pid)) {
+    killServer(target, true); // escalate
+    for (let i = 0; i < 10; i++) {
+      await sleep(500);
+      if (!pidAlive(pid)) break;
+    }
+  }
+
+  if (pidAlive(pid)) {
+    out.print(`Could not stop the server at ${rec.url} (pid ${pid}) — it is still running.`);
+    out.print("Keeping the record so it stays visible to `opencode-task server`.");
+    process.exit(1);
+  }
+
+  // Only now is it safe to forget it.
   clearServer();
-  out.print(`Stopped server ${rec.url} (pid ${rec.pid}).`);
+  out.print(`Stopped server ${rec.url} (pid ${pid}).`);
+  if (sdk) {
+    const still = listenerPid(rec.port);
+    if (still) out.print(`Note: port ${rec.port} is still in use by pid ${still} (a different process).`);
+  }
+}
+
+// Everything the user asked to be able to see: port, pid, is the pid alive, does it answer.
+async function cmdServer(sdk) {
+  const { flags } = parseFlags(rest);
+  const rec = readServer();
+  const lock = readLock();
+  const { port: wantPort, url: wantUrl } = targetOf(flags);
+
+  // An explicit --url/OPENCODE_URL is what every other command talks to, so report on THAT server,
+  // not on the managed target. Otherwise `server` describes a different process than `run` uses.
+  const explicitUrl = flags.url || process.env.OPENCODE_URL;
+  const url = explicitUrl || rec?.url || wantUrl;
+  let port = rec?.port ?? wantPort;
+  if (explicitUrl) {
+    try {
+      const u = new URL(explicitUrl);
+      port = Number(u.port) || (u.protocol === "https:" ? 443 : 80);
+    } catch {
+      /* keep the fallback */
+    }
+  }
+  // Only trust a port-derived pid for a server on this machine; for a remote url it would name an
+  // unrelated local process that happens to hold the same port number.
+  const local = !explicitUrl || /^(127\.|localhost$|\[?::1\]?$|0\.0\.0\.0$)/.test(new URL(url).hostname);
+  const pid = local ? listenerPid(port) ?? (explicitUrl ? null : rec?.pid ?? null) : null;
+  const alive = pidAlive(pid);
+  const client = clientFor(sdk, url);
+  const responding = await healthOk(client);
+  const busy = responding ? await activeSessions(client) : null;
+  const uptime =
+    rec?.startedAt && responding ? Math.round((Date.now() - rec.startedAt) / 1000) : null;
+
+  if (flags.json) {
+    out.emit({
+      state: responding ? "running" : rec ? "recorded-but-not-responding" : "stopped",
+      url,
+      port,
+      pid,
+      pidAlive: alive,
+      responding,
+      managed: rec ? rec.managed !== false : null,
+      recorded: Boolean(rec),
+      uptimeSeconds: uptime,
+      busySessions: busy,
+      stateFile: SERVER_FILE,
+      lock: lock ? { pid: lock.pid, holderAlive: pidAlive(lock.pid), stale: lockIsStale(lock) } : null,
+    });
+    return;
+  }
+
+  out.print(responding ? "opencode server: RUNNING" : rec ? "opencode server: NOT RESPONDING" : "opencode server: stopped");
+  out.print(`  url:        ${url}`);
+  out.print(`  port:       ${port}`);
+  out.print(`  pid:        ${pid ?? "-"}${pid ? (alive ? " (alive)" : " (DEAD)") : ""}`);
+  out.print(`  responding: ${responding ? "yes" : "no"}`);
+  if (explicitUrl) out.print(`  ownership:  external — --url/OPENCODE_URL; this CLI neither starts nor records it`);
+  else if (rec) out.print(`  ownership:  ${rec.managed === false ? "adopted (started outside this CLI)" : "started by this CLI"}`);
+  if (uptime !== null) out.print(`  uptime:     ${uptime}s`);
+  if (busy?.length) {
+    out.print(`  busy:       ${busy.length} session(s) working — 'stop' will refuse without --force`);
+    for (const b of busy) out.print(`                ${b.id} [${b.state}]`);
+  } else if (responding) {
+    out.print("  busy:       no active sessions");
+  }
+  out.print(`  record:     ${rec ? SERVER_FILE : "none — no server recorded"}`);
+  if (lock) {
+    out.print(
+      `  lock:       held by pid ${lock.pid} (${pidAlive(lock.pid) ? "alive" : "dead"}${lockIsStale(lock) ? ", stale" : ""})`
+    );
+  }
+  if (!responding && explicitUrl) {
+    out.print("");
+    out.print("Nothing answers at that url. This CLI will not start one while --url/OPENCODE_URL is set.");
+  } else if (!responding && rec) {
+    out.print("");
+    out.print("The record points at a server that does not answer. Clear it with: opencode-task stop");
+  } else if (!rec && !responding) {
+    out.print("");
+    out.print("A server starts automatically on the next command, or explicitly with: opencode-task serve");
+  }
 }
 
 async function cmdStatus(sdk) {
@@ -570,11 +1069,27 @@ Commands:
   summary <id>              Generate a concise bullet summary of a task.
   cancel <id>               Abort a running task.
   serve [--port P]          Start (or reuse) the background server.
-  stop                      Stop the server this CLI started.
+  server                    Show the server: url, port, pid, whether the pid is alive, whether
+                            it responds, uptime, ownership, busy sessions and lock state.
+                            --json for machine use.
+  stop                      Stop the server, confirming it actually died before forgetting it.
+                            Refuses while any session is still working, listing them.
+    --force                 Stop anyway — kills the process even mid-task (last resort; the
+                            output those sessions were producing is lost).
 
-Server:
-  The CLI auto-starts a background 'opencode serve' (default port ${DEFAULT_PORT}) and reuses it
-  across calls. To use a server you already run, pass --url <url> or set OPENCODE_URL.
+Server (exactly one, ever):
+  The CLI auto-starts a background 'opencode serve' (default port ${DEFAULT_PORT}) and reuses it across
+  calls. Concurrent invocations cannot each start their own: whoever wins an atomic lock starts
+  the server and the rest wait for it. If something healthy is already listening on the port it is
+  adopted rather than duplicated, and the port is never auto-incremented — so a machine cannot
+  accumulate stray servers. Inspect with 'server', shut down with 'stop'.
+
+  State (generated, declarative):
+    ${SERVER_FILE}
+    ${LOCK_FILE}   (only while a server is being started)
+
+  To use a server you already run, pass --url <url> or set OPENCODE_URL — that path never spawns
+  or records anything. Override the managed port with --port / OPENCODE_PORT.
 
 Global flags: --json (machine-readable output). Requires: npm i -g @opencode-ai/sdk`);
 }
@@ -712,10 +1227,11 @@ function truncate(s, n) {
 
 // --- main ------------------------------------------------------------------
 async function main() {
-  if (command === "stop") return cmdStop();
   if (command === "help" || command === "--help" || command === "-h") return cmdHelp();
   const sdk = await loadSDK();
   switch (command) {
+    case "stop": return cmdStop(sdk);
+    case "server": return cmdServer(sdk);
     case "run": return cmdRun(sdk);
     case "status": return cmdStatus(sdk);
     case "list": return cmdList(sdk);

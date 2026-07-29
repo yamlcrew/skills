@@ -124,7 +124,20 @@ manage ports yourself. Each task is a server session; status is read live. Requi
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "..."      # async → session id
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" status <id>    # RUNNING | done
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" wait   <id>    # block then print result
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" server         # port, pid, alive?, responding?
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop           # refuses while sessions are busy
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" stop --force   # kill even mid-task (last resort)
 ```
+
+Unlike the manual `serve`/`--attach` flow above, the script guarantees **one** server. It records it
+in a generated `server.json` (state dir: `%LOCALAPPDATA%` on Windows, `$XDG_DATA_HOME` or
+`~/.local/share` elsewhere) and serialises startup through an atomic `server.lock`, so parallel
+invocations cannot each spawn their own. A healthy server already on the port is adopted rather than
+duplicated, and the port is **not** auto-incremented — if it is occupied by something else the
+script says so instead of quietly starting another instance elsewhere. `server` reports port, pid,
+whether that pid is alive, whether the instance answers, and which sessions are busy. `stop`
+refuses while any session is still working and lists them (`--force` overrides), and confirms the
+process really died before clearing the record.
 
 Anchor the path with `${CLAUDE_PLUGIN_ROOT}` in Claude Code; on agents without that variable use the
 path to `scripts/` relative to the skill's own directory. A bare `scripts/…` resolves against the
