@@ -1,6 +1,6 @@
 ---
 description: Delegate an async task to OpenCode, or check/read an existing task (SDK-based)
-argument-hint: '[run|status|wait|result|summary|list|cancel] [id] [prompt] [--model p/m] [--title t] [-f file] [--wait]'
+argument-hint: '[run|status|wait|result|summary|list|cancel|server|stop] [id] [prompt] [--model p/m] [--title t] [-f file] [--wait]'
 allowed-tools: Bash(node:*), Bash(timeout:*), AskUserQuestion
 ---
 
@@ -26,6 +26,15 @@ tool (wrap long waits in `timeout`):
 - `result <id>` → print a finished task's full output (`--raw` for piping, `--verbose` for reasoning).
 - `summary <id>` → generate a concise bullet summary of a task's outcome.
 - `cancel <id>` → abort a running task.
+- `server` → inspect the single managed server: url, port, pid, whether the pid is alive, whether it
+  responds, uptime, and whether this CLI started it or adopted it (`--json` for machine output).
+- `stop` → shut that server down; it confirms the process actually died before forgetting it.
+  **Refuses while any session is still working**, listing them — add `--force` to kill anyway
+  (last resort; the output those sessions were producing is lost).
+
+There is only ever **one** server: concurrent invocations coordinate through a lock file, an existing
+server on the port is adopted rather than duplicated, and the port is never auto-incremented. If a
+command reports it cannot start one, run `server` to see what is holding the port.
 
 ## Steps
 
