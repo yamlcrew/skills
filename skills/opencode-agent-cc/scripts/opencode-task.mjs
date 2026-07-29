@@ -189,7 +189,6 @@ async function startServer(flags, sdk) {
   // try the requested port, then a few above it in case it's taken
   const tryStart = (p) =>
     new Promise((resolve) => {
-      const log = join(DATA_DIR, "server.log");
       const child = spawn(
         "opencode",
         ["serve", "--hostname", host, "--port", String(p)],
@@ -302,6 +301,73 @@ function buildBody(flags, promptText) {
   return body;
 }
 
+// --- model validation ------------------------------------------------------
+// A model the server cannot resolve is never reported as an error: the session is created, the
+// prompt is accepted, and no assistant message is ever produced — indistinguishable from "still
+// thinking", so `wait` spins until it times out. Catch it before the task is submitted.
+function capped(items, max = 24) {
+  const shown = items.slice(0, max).join(", ");
+  return items.length > max ? `${shown}, … +${items.length - max} more` : shown;
+}
+
+function exitUnavailable(headline, source, detail) {
+  out.print(headline);
+  out.print(`  source: ${source}`);
+  out.print(`  ${detail}`);
+  out.print(
+    source === "--model"
+      ? "Pass an available model with --model <provider/model>."
+      : 'Fix the "model" field in opencode.json, or pass --model <provider/model> for this task.'
+  );
+  process.exit(1);
+}
+
+async function assertModelAvailable(client, flags) {
+  const source = flags.model ? "--model" : "the configured default (opencode.json)";
+  let effective = flags.model;
+  if (!effective) {
+    try {
+      effective = dataOf(await client.config.get())?.model;
+    } catch {
+      return; // config unreadable — let the server decide
+    }
+  }
+  if (!effective) return; // nothing configured anywhere — the server picks its own
+
+  let listed;
+  try {
+    listed = dataOf(await client.provider.list());
+  } catch {
+    return; // provider list unreachable — let the server decide
+  }
+  if (!Array.isArray(listed?.all)) return; // unknown shape — do not block
+
+  // `all` lists every known provider, so narrow to the ones actually connected.
+  const connected = new Set(listed.connected ?? []);
+  const usable = listed.all.filter((p) => connected.size === 0 || connected.has(p.id));
+  const slash = effective.indexOf("/");
+  const providerID = slash > 0 ? effective.slice(0, slash) : effective;
+  const modelID = slash > 0 ? effective.slice(slash + 1) : "";
+  const provider = usable.find((p) => p.id === providerID);
+
+  if (provider) {
+    const models = Object.keys(provider.models ?? {});
+    if (!models.length) return; // provider advertises no models — cannot verify, do not block
+    if (models.includes(modelID)) return;
+    exitUnavailable(
+      `Model "${effective}" is not available.`,
+      source,
+      `${providerID} models: ${capped(models.sort())}`
+    );
+  } else {
+    exitUnavailable(
+      `Model "${effective}" is not available (provider "${providerID}" is not connected).`,
+      source,
+      `connected providers: ${capped(usable.map((p) => p.id).sort())}`
+    );
+  }
+}
+
 // --- commands --------------------------------------------------------------
 async function cmdRun(sdk) {
   const { flags, positional } = parseFlags(rest);
@@ -315,6 +381,8 @@ async function cmdRun(sdk) {
   }
 
   const { url, client } = await ensureServer(flags, sdk);
+
+  await assertModelAvailable(client, flags);
 
   const created = await client.session.create({
     body: { title: flags.title || prompt.slice(0, 60) || "task" },
