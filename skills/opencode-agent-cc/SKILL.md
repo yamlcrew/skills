@@ -98,6 +98,7 @@ tasks you intend to be write-capable. A custom `--agent <name>` with fixed permi
 | Let OpenCode write/edit | `opencode run --agent build --dangerously-skip-permissions "<prompt>"` |
 | Many calls in one session | start `opencode serve`, then `opencode run --attach <url> "…"` |
 | Override model (only if user asked) | `opencode run --model <p/m> "<prompt>"` (id must be in `opencode models`) |
+| Diagnose the setup (installed? model? warnings?) | `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" doctor --pretty` |
 | Async fire-and-forget task + status/result later | `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
 
 For the full flag table, headless-server (`serve`/`--attach`) mode, model-selection notes,
@@ -110,8 +111,12 @@ For "submit a task, come back later" delegation use the bundled **`scripts/openc
 async-task CLI built on the OpenCode **SDK** (`@opencode-ai/sdk`) and a headless server it manages for you.
 Every task is an OpenCode *session* on that server, so status is read live (no stale local state).
 
-Requires the SDK installed once: `npm install -g @opencode-ai/sdk`. Same model rule as above — it runs on
-the user's configured default unless you pass `--model provider/model` (only when the user asked).
+The task subcommands need the SDK installed once: `npm install -g @opencode-ai/sdk`. **`doctor` does
+not** — it loads no SDK, so it is the right first call when anything looks wrong: it reports whether
+`opencode` is installed, the configured default model, the managed server, and `warnings` such as a
+configured model that no longer exists (which makes every task silently return nothing). Same model
+rule as above — tasks run on the user's configured default unless you pass `--model provider/model`
+(only when the user asked).
 
 The script sits in `scripts/` next to this file. In Claude Code, anchor it with `${CLAUDE_PLUGIN_ROOT}`;
 on agents where that variable does not exist (Cursor, Codex, Copilot, …), use the path to `scripts/`
@@ -119,6 +124,7 @@ relative to this skill's own directory — a bare `scripts/…` resolves against
 directory, not the skill, and will not be found.
 
 ```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" doctor --pretty    # env report: installed? model? warnings? (no SDK needed)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "Refactor src/auth.ts into smaller modules"   # async → session id
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" status <id>        # RUNNING / done (+ tokens, cost, model)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" wait   <id>        # block until done, then print the result
@@ -143,7 +149,9 @@ sessions; pass `--force` to kill regardless. It verifies the process actually di
 the record. `--url` / `OPENCODE_URL` bypasses all of this and
 never spawns anything.
 
-`run` options: `--model <p/m>`, `--title <t>`, `-f <file>` (attach context; repeatable), `--dir <path>`,
+`run` options: `--model <p/m>`, `--title <t>`, `-f <file>` (attach context; repeatable), `--dir <path>`
+(working directory for that task's session — it stays followable by id via `status`/`wait`/`result`,
+though `list` only shows sessions for the current directory),
 `--wait`. Use it (or the `/opencode-agent-cc:task` command) when you want to delegate and poll rather than
 block on a single `opencode run`.
 
