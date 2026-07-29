@@ -121,6 +121,7 @@ manage ports yourself. Each task is a server session; status is read live. Requi
 @opencode-ai/sdk`. See the SKILL.md "Async task delegation" section and `/opencode-agent-cc:task`.
 
 ```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" doctor         # env report (no SDK needed; --pretty for text)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" run "..."      # async → session id
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" status <id>    # RUNNING | done
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" wait   <id>    # block then print result
@@ -128,6 +129,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" server         # port, pid,
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop           # refuses while sessions are busy
 node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-cc.mjs" stop --force   # kill even mid-task (last resort)
 ```
+
+`doctor` is the one subcommand that needs no SDK and no server — it shells out to `opencode` directly
+and reports the binary, version, configured default/small model, providers (baseURL only), available
+models, MCP servers, the managed server and live opencode processes, plus warnings such as a
+configured model that is missing from `opencode models`. Secrets are never emitted.
 
 Unlike the manual `serve`/`--attach` flow above, the script guarantees **one** server. It records it
 in a generated `server.json` (state dir: `%LOCALAPPDATA%` on Windows, `$XDG_DATA_HOME` or

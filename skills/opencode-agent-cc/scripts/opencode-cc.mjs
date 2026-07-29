@@ -41,8 +41,9 @@ import {
   openSync,
   closeSync,
   statSync,
+  existsSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 
@@ -734,7 +735,19 @@ async function cmdRun(sdk) {
 
   await assertModelAvailable(client, flags);
 
+  // --dir sets the session's working directory server-side. It used to be parsed and then ignored,
+  // so the flag was documented but did nothing.
+  let directory = null;
+  if (flags.dir) {
+    directory = resolve(flags.dir);
+    if (!existsSync(directory)) {
+      out.print(`No such directory: ${directory}`);
+      process.exit(1);
+    }
+  }
+
   const created = await client.session.create({
+    ...(directory ? { query: { directory } } : {}),
     body: { title: flags.title || prompt.slice(0, 60) || "task" },
   });
   const session = dataOf(created);
@@ -1072,7 +1085,7 @@ Commands:
     --model provider/model  Override the configured default model.
     --title <t>             Name the task.
     --file <path> / -f      Attach a file (added as context). Repeatable.
-    --dir <path> / -d       Working directory for the server.
+    --dir <path> / -d       Working directory for this task's session (default: cwd).
   status [id]               Show one task's state, or all recent/running tasks.
   list                      Same as 'status' with no id.
   wait <id>                 Block until <id> finishes, then print its output.
