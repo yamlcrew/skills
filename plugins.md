@@ -1,6 +1,6 @@
 # Plugins — How-To Guide
 
-> **Source of truth**: `plugins/<plugin-name>/`
+> **Plugin roots in this repo**: `skills/<plugin-name>/` — each one is both a plugin root and a skills.sh skill directory
 > **Reference**: [Claude Code Plugins Reference](https://code.claude.com/docs/en/plugins-reference)
 
 A plugin is a self-contained directory that extends Claude Code with custom functionality. Plugins bundle skills, agents, hooks, MCP servers, and scripts into a single distributable unit. This guide covers the Claude Code plugin format and how to create plugins for this repository.
@@ -40,7 +40,6 @@ The manifest defines the plugin's identity. It's optional (Claude Code auto-disc
 {
   "name": "my-plugin",
   "description": "What this plugin does — shown in the plugin manager",
-  "version": "1.0.0",
   "author": {
     "name": "Your Name",
     "url": "https://github.com/your-handle"
@@ -57,19 +56,21 @@ The manifest defines the plugin's identity. It's optional (Claude Code auto-disc
 |---|---|---|
 | `name` | **Yes** | Unique identifier and skill namespace. Skills are prefixed: `/my-plugin:skill-name` |
 | `description` | **Yes** | Shown in plugin manager when browsing or installing |
-| `version` | Recommended | If set, users only get updates when you bump this field. If omitted, every git commit counts as a new version |
+| `version` | Optional | Format allows it: if set, users only get updates when you bump this field; if omitted, every git commit counts as a new version. **This repo omits it deliberately** — see [Version management](#version-management) |
 | `author` | Optional | Attribution |
 | `homepage` | Optional | Link to project page |
 | `repository` | Optional | Link to source repo |
 | `license` | Optional | SPDX license identifier |
 
-> **Keep `description` identical and unambiguous across both manifests.** The same text must appear in two places: `.claude-plugin/marketplace.json` → `plugins[].description` and `plugins/<plugin-name>/.claude-plugin/plugin.json` → `description`. Write one short, concrete sentence that leaves no doubt what the plugin *is* — not marketing copy. When you change one, change the other.
+> **Keep `description` identical and unambiguous across both manifests.** The same text must appear in two places: `.claude-plugin/marketplace.json` → `plugins[].description` and `skills/<plugin-name>/.claude-plugin/plugin.json` → `description`. Write one short, concrete sentence that leaves no doubt what the plugin *is* — not marketing copy. When you change one, change the other.
 
 ### Version management
 
-- **With `version`**: users receive updates only when you bump the version string
-- **Without `version`**: if distributed via git, every commit SHA is treated as a new version
-- Always bump `version` when you want users to receive an update
+- **With `version`**: Claude Code caches by version string, so users receive updates only when you bump it — suited to published plugins with stable release cycles
+- **Without `version`**: every commit SHA is treated as a new version, so every push reaches installed users — suited to plugins under active development
+- **This repo sets no `version`**, neither in `plugin.json` nor in marketplace entries. A hand-maintained version that nobody bumps freezes installed users on the first release — which is what happened here, 26 commits with all 8 plugins pinned to `1.0.0`. These plugins are reference documentation under active development, with no API surface to version
+- The top-level `version` in `.claude-plugin/marketplace.json` is the **marketplace** version, a different thing — that one stays
+- Consequence: `claude plugin validate` reports one `No version specified` warning per plugin, so CI runs it **without** `--strict`
 
 ## Components
 
@@ -89,7 +90,7 @@ skills/
         └── validate.sh
 ```
 
-If the plugin has **no `skills/` directory**, a lone `SKILL.md` at the plugin root is loaded as a single skill. Set frontmatter `name` to control the invocation name — without it, Claude Code falls back to the install directory name (which is a version hash for marketplace plugins and changes on every update).
+If the plugin has **no `skills/` directory** and no `skills` field in its manifest, a lone `SKILL.md` at the plugin root is loaded as a single skill. **That is the mechanism every plugin in this repo relies on** — see [How this repo is organized](#how-this-repo-is-organized). Set frontmatter `name` to control the invocation name — without it, Claude Code falls back to the install directory name (which is a version hash for marketplace plugins and changes on every update).
 
 See [skills.md](./skills.md) for the full skill authoring guide.
 
@@ -228,16 +229,15 @@ A marketplace is a GitHub repo with a `.claude-plugin/marketplace.json` that lis
     {
       "name": "plugin-name",
       "description": "What this plugin does",
-      "version": "1.0.0",
       "author": { "name": "Author" },
-      "source": "./plugins/plugin-name",
+      "source": "./skills/plugin-name",
       "category": "development"
     }
   ]
 }
 ```
 
-**`source` field**: relative path from repo root to the plugin directory. Claude Code looks for `.claude-plugin/plugin.json` inside that directory.
+**`source` field**: relative path from repo root to the plugin directory. Claude Code looks for `.claude-plugin/plugin.json` inside that directory and treats the directory itself as the plugin root. In this repo that directory is `./skills/<plugin-name>`.
 
 **Categories**: `development`, `productivity`, `learning`, `security`, etc.
 
@@ -261,7 +261,7 @@ Example: `/plugin install fumadocs-engineer@yamlcrew`
 
 ### Auto-updating
 
-Marketplaces support auto-updating — Claude Code periodically refreshes the manifest and updates installed plugins when a new version is detected.
+Marketplaces support auto-updating — Claude Code periodically refreshes the manifest and updates installed plugins when a new version is detected. Since the manifests here carry no `version`, the commit SHA is the version and every pushed commit is an update.
 
 ## How this repo is organized
 
@@ -269,39 +269,41 @@ Marketplaces support auto-updating — Claude Code periodically refreshes the ma
 <root>/
 ├── .claude-plugin/
 │   └── marketplace.json              ← Marketplace registry
-├── plugins/                          ← Source of truth for all plugins
-│   └── fumadocs-engineer/
+├── skills/                           ← One directory per plugin; each is also a skills.sh skill
+│   └── fumadocs-engineer/            ← Plugin root
 │       ├── .claude-plugin/
 │       │   └── plugin.json           ← Plugin manifest
-│       ├── skills/
-│       │   └── fumadocs-engineer/
-│       │       ├── SKILL.md
-│       │       └── references/
-│       └── README.md
-├── skills/                           ← Generated (plugins2skills.py); committed (skills.sh reads it)
-│   └── fumadocs-engineer/
-│       ├── SKILL.md
-│       └── references/
-├── plugins2skills.py                 ← Sync script: plugins/ → skills/
+│       ├── SKILL.md                  ← In the plugin root → the plugin's single skill
+│       ├── references/
+│       ├── commands/                 ← Optional (Claude Code only)
+│       └── agents/                   ← Optional (Claude Code only)
 ├── plugins.md                        ← This guide
 ├── skills.md                         ← Skills authoring guide
+├── skills.sh.json                    ← skills.sh repo page groupings
 ├── README.md
 └── LICENSE
 ```
 
+There is no separate plugin tree and no build or sync step — one directory serves both distribution channels:
+
+- **skills.sh** scans `skills/` one level deep, so `skills/<name>/SKILL.md` is found natively
+- **Claude Code** resolves the marketplace entry's `"source": "./skills/<name>"` as the plugin root; with no `skills/` subdirectory there, the root `SKILL.md` loads as the plugin's single skill, and `commands/`, `agents/` and `hooks/` sit exactly where the loader expects them
+
+This works because the repo is strictly **one plugin = one skill** — the directory name is the plugin name, the marketplace entry name and the skill name. Both channels publish the **whole** directory: a skills.sh install writes `references/`, `scripts/`, `commands/`, `agents/`, `prompts/` and `.claude-plugin/plugin.json` to disk, so `commands/` and `agents/` reach non-Claude agents as inert files. And because `plugin.json` travels with the skill, Claude Code auto-detects a skills.sh install under `~/.claude/skills/<name>/` as a local plugin `<name>@skills-dir` with no marketplace step; a marketplace install of the same plugin takes precedence and auto-disables that copy, so there is no double-load.
+
 ### Adding a new plugin
 
-1. Create `plugins/<plugin-name>/` with the structure above
-2. Add `.claude-plugin/plugin.json` with name, description, version
-3. Add `skills/<skill-name>/SKILL.md` inside the plugin
-4. Register in `.claude-plugin/marketplace.json` under `plugins[]`
-5. Run `python plugins2skills.py` to generate `skills/` for skills.sh
+1. Create `skills/<plugin-name>/` — this directory is the plugin root
+2. Add `.claude-plugin/plugin.json` with name and description (no `version`)
+3. Add `SKILL.md` beside it, with frontmatter `name` and `description` — skills.sh silently drops a skill whose `description` is missing, and `claude plugin validate` does not flag it
+4. Register in `.claude-plugin/marketplace.json` under `plugins[]` with `"source": "./skills/<plugin-name>"`
+5. Add the skill's name to a grouping in `skills.sh.json` and a row to `plugins-list.md` — **CI fails if a skill is ungrouped**
 6. Record the change in `CHANGELOG.md` under `## [Unreleased]` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format) — every plugin change is logged here
 7. Commit and push
 
 ## Changelog
 
-Every plugin change **must** be recorded in `CHANGELOG.md`, and the file **must follow** the [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) format. Add entries under `## [Unreleased]` as you work; on release, rename that heading to `## [x.y.z] - YYYY-MM-DD` (SemVer `MAJOR.MINOR.PATCH`, matching the `version` in both manifests) and open a fresh `## [Unreleased]`.
+Every plugin change **must** be recorded in `CHANGELOG.md`, and the file **must follow** the [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) format. Add entries under `## [Unreleased]` as you work; on release, rename that heading to `## [x.y.z] - YYYY-MM-DD` (SemVer `MAJOR.MINOR.PATCH`) and open a fresh `## [Unreleased]`. There is no manifest `version` to match — see [Version management](#version-management); the changelog is the human-readable record of what changed, not the distribution mechanism.
 
 Use **only** these six change-type sections, in this order, omitting any that are empty:
 

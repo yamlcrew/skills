@@ -15,3 +15,6 @@ tmp/
 # Packaged skill archives (built artifacts, not source)
 *.skill
 
+# Python bytecode
+__pycache__/
+*.py[cod]

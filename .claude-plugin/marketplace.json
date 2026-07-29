@@ -11,89 +11,81 @@
     {
       "name": "fumadocs-engineer",
       "description": "Senior engineer for Fumadocs, the Next.js documentation framework — scaffolds, configures, and debugs docs sites and authors MDX content.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/fumadocs-engineer",
+      "source": "./skills/fumadocs-engineer",
       "category": "development"
     },
     {
       "name": "zensical-writer",
       "description": "Senior technical writer and engineer for Zensical, the static site generator by the Material for MkDocs team — scaffolds, configures, and authors documentation sites.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/zensical-writer",
+      "source": "./skills/zensical-writer",
       "category": "development"
     },
     {
       "name": "opencode-agent-cc",
       "description": "Run the headless OpenCode CLI from Claude Code for code review, adversarial review, second opinions, and write-capable rescue/fix tasks — respecting the user's configured provider and model.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/opencode-agent-cc",
+      "source": "./skills/opencode-agent-cc",
       "category": "development"
     },
     {
       "name": "pi-agent-cc",
       "description": "Run the headless pi CLI (`pi -p`) from Claude Code for code review, adversarial review, second opinions, and write-capable rescue/fix tasks — respecting the user's configured provider and model.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/pi-agent-cc",
+      "source": "./skills/pi-agent-cc",
       "category": "development"
     },
     {
       "name": "effect-ts",
       "description": "Senior engineer for Effect (Effect-TS), the typed functional TypeScript framework — services and layers, typed errors, Schema, concurrency, streams, testing, SQL, and ecosystem integrations.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/effect-ts",
+      "source": "./skills/effect-ts",
       "category": "development"
     },
     {
       "name": "lazy-senior-dev",
       "description": "Lazy senior dev mode. Forces the simplest, shortest solution that actually works: YAGNI, stdlib first, no unrequested abstractions. Activates on the /lazy-senior-dev:* commands or when its description matches — no always-on session hooks.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/lazy-senior-dev",
+      "source": "./skills/lazy-senior-dev",
       "category": "productivity"
     },
     {
       "name": "agent-host-protocol",
       "description": "Reference for the Agent Host Protocol (AHP) — the JSON-RPC, channel-based state-sync protocol for multi-client AI agent sessions — covering channels, actions, reducers, write-ahead reconciliation, tool calls, and authentication.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/agent-host-protocol",
+      "source": "./skills/agent-host-protocol",
       "category": "development"
     },
     {
       "name": "use-nubjs",
       "description": "Reference and senior-engineer skill for nub (nubjs), the Rust CLI toolchain that augments Node.js — TypeScript file runner, nub run / nubx runners, the pnpm-compatible package manager, nub pm and nub node, and deployment.",
-      "version": "1.0.0",
       "author": {
         "name": "yamlcrew",
         "url": "https://github.com/yamlcrew/skills"
       },
-      "source": "./plugins/use-nubjs",
+      "source": "./skills/use-nubjs",
       "category": "development"
     }
   ]

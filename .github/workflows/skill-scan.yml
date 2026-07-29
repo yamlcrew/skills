@@ -22,13 +22,15 @@ on:
     branches: [main]
     paths:
       - "skills/**"
-      - "plugins/**"
+      - ".claude-plugin/marketplace.json"
+      - "skills.sh.json"
       - ".github/workflows/skill-scan.yml"
       - ".github/scripts/scan_summary.py"
   pull_request:
     paths:
       - "skills/**"
-      - "plugins/**"
+      - ".claude-plugin/marketplace.json"
+      - "skills.sh.json"
       - ".github/workflows/skill-scan.yml"
       - ".github/scripts/scan_summary.py"
   schedule:

@@ -1,0 +1,11 @@
+{
+  "name": "fumadocs-engineer",
+  "description": "Senior engineer for Fumadocs, the Next.js documentation framework — scaffolds, configures, and debugs docs sites and authors MDX content.",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}

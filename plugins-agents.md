@@ -49,7 +49,7 @@ Key mechanics to design around:
 |-------|------|----------|
 | Project | `.claude/agents/` | Team-shared; commit to VCS |
 | User | `~/.claude/agents/` | Personal agents across all projects |
-| Plugin | `plugins/<name>/agents/` | Distributed with a plugin |
+| Plugin | `skills/<name>/agents/` | Distributed with a plugin (in this repo the plugin root is `skills/<name>/`) |
 
 On a name collision: managed settings > CLI `--agents` > project > user > plugin. Both project and user directories are scanned recursively; subfolders are organizational only — identity comes from the `name` field. In a **plugin**, the subfolder becomes part of the scoped identifier: `agents/review/security.md` in `my-plugin` registers as `my-plugin:review:security`.
 
