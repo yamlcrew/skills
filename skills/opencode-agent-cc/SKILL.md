@@ -98,7 +98,7 @@ tasks you intend to be write-capable. A custom `--agent <name>` with fixed permi
 | Let OpenCode write/edit | `opencode run --agent build --dangerously-skip-permissions "<prompt>"` |
 | Many calls in one session | start `opencode serve`, then `opencode run --attach <url> "…"` |
 | Override model (only if user asked) | `opencode run --model <p/m> "<prompt>"` (id must be in `opencode models`) |
-| Async fire-and-forget task + status/result later | `node scripts/opencode-task.mjs run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
+| Async fire-and-forget task + status/result later | `node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "<prompt>"` → `status <id>` / `wait <id>` / `result <id>` |
 
 For the full flag table, headless-server (`serve`/`--attach`) mode, model-selection notes,
 troubleshooting, and an optional reusable subagent definition, read
@@ -113,15 +113,20 @@ Every task is an OpenCode *session* on that server, so status is read live (no s
 Requires the SDK installed once: `npm install -g @opencode-ai/sdk`. Same model rule as above — it runs on
 the user's configured default unless you pass `--model provider/model` (only when the user asked).
 
+The script sits in `scripts/` next to this file. In Claude Code, anchor it with `${CLAUDE_PLUGIN_ROOT}`;
+on agents where that variable does not exist (Cursor, Codex, Copilot, …), use the path to `scripts/`
+relative to this skill's own directory — a bare `scripts/…` resolves against the user's working
+directory, not the skill, and will not be found.
+
 ```bash
-node scripts/opencode-task.mjs run "Refactor src/auth.ts into smaller modules"   # async → prints a session id
-node scripts/opencode-task.mjs status <id>        # RUNNING / done (+ tokens, cost, model)
-node scripts/opencode-task.mjs wait   <id>        # block until done, then print the result
-node scripts/opencode-task.mjs result <id>        # full output of a finished task (--raw to pipe)
-node scripts/opencode-task.mjs summary <id>       # concise bullet summary of a task
-node scripts/opencode-task.mjs list               # all tasks (running first)
-node scripts/opencode-task.mjs cancel <id>        # abort a running task
-node scripts/opencode-task.mjs run --wait "…"     # foreground instead of async
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "Refactor src/auth.ts into smaller modules"   # async → session id
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" status <id>        # RUNNING / done (+ tokens, cost, model)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" wait   <id>        # block until done, then print the result
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" result <id>        # full output of a finished task (--raw to pipe)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" summary <id>       # concise bullet summary of a task
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" list               # all tasks (running first)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" cancel <id>        # abort a running task
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run --wait "…"     # foreground instead of async
 ```
 
 `run` options: `--model <p/m>`, `--title <t>`, `-f <file>` (attach context; repeatable), `--dir <path>`,

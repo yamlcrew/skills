@@ -121,10 +121,14 @@ manage ports yourself. Each task is a server session; status is read live. Requi
 @opencode-ai/sdk`. See the SKILL.md "Async task delegation" section and `/opencode-agent-cc:task`.
 
 ```bash
-node scripts/opencode-task.mjs run "..."      # async → session id
-node scripts/opencode-task.mjs status <id>    # RUNNING | done
-node scripts/opencode-task.mjs wait   <id>    # block then print result
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" run "..."      # async → session id
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" status <id>    # RUNNING | done
+node "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-task.mjs" wait   <id>    # block then print result
 ```
+
+Anchor the path with `${CLAUDE_PLUGIN_ROOT}` in Claude Code; on agents without that variable use the
+path to `scripts/` relative to the skill's own directory. A bare `scripts/…` resolves against the
+user's working directory, not the skill, and will not be found.
 
 For programmatic control beyond fire-and-forget tasks, use the SDK directly: `createOpencodeClient({
 baseUrl: "http://127.0.0.1:4096" })` against a running server, or `createOpencode()` to start an embedded

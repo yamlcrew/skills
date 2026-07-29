@@ -1,0 +1,98 @@
+name: Validate manifests
+
+# Structural gate for the single-folder layout: each skills/<name>/ is BOTH the skill
+# directory (consumed by skills.sh) and the plugin root (consumed by the Claude Code
+# marketplace), so a mistake in one file can break either channel.
+#
+# NOTE ON --strict: it is deliberately NOT used. Plugin manifests intentionally carry no
+# `version` field (the commit SHA is the version, so every push reaches installed users),
+# which makes `claude plugin validate` emit one "No version specified" warning per plugin.
+# --strict promotes warnings to errors and would fail every run. Non-strict still fails on
+# every real defect (invalid JSON, wrong field types, schema violations) — verified.
+#
+# The discovery-count assertion below is the check that actually protects us: a SKILL.md
+# missing its frontmatter `description` is silently dropped by skills.sh (8 skills become
+# 7) and `claude plugin validate` does NOT flag it, not even with --strict.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - ".claude-plugin/marketplace.json"
+      - "skills.sh.json"
+      - ".github/workflows/validate.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - ".claude-plugin/marketplace.json"
+      - "skills.sh.json"
+      - ".github/workflows/validate.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate manifests
+    runs-on: ubuntu-latest
+    env:
+      # Keep the CLI hermetic: never touch a runner-global config.
+      CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-config
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      # Official validator: plugin.json, marketplace.json, skill/agent frontmatter,
+      # hooks.json schema. Non-strict on purpose — see the note at the top of this file.
+      - name: Validate marketplace
+        run: claude plugin validate .
+
+      - name: Validate every plugin root
+        run: |
+          set -euo pipefail
+          for d in skills/*/; do
+            echo "--- $d"
+            claude plugin validate "./$d"
+          done
+
+      # A skill whose SKILL.md lost its `description` vanishes from skills.sh without any
+      # validator complaining. Assert the discovered count matches the directory count.
+      - name: Assert skills.sh discovers every skill
+        run: |
+          set -euo pipefail
+          expected=$(ls -1d skills/*/ | wc -l | tr -d ' ')
+          output=$(npx -y skills@latest add . --list 2>&1 || true)
+          found=$(printf '%s' "$output" | grep -oE 'Found [0-9]+ skills' | grep -oE '[0-9]+' || true)
+          echo "expected=$expected found=${found:-<none>}"
+          if [ "$expected" != "${found:-}" ]; then
+            echo "::error::skills.sh discovered ${found:-0} skills but skills/ has $expected."
+            echo "A SKILL.md is probably missing its frontmatter name/description."
+            printf '%s\n' "$output" | tail -40
+            exit 1
+          fi
+
+      # Every skill must appear in exactly one skills.sh.json grouping, or the repo page
+      # on skills.sh silently mis-renders.
+      - name: Validate skills.sh.json groupings
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          d = json.loads(pathlib.Path("skills.sh.json").read_text())
+          listed = [s for g in d["groupings"] for s in g["skills"]]
+          dirs = {p.name for p in pathlib.Path("skills").iterdir() if p.is_dir()}
+          missing = sorted(dirs - set(listed))
+          unknown = sorted(set(listed) - dirs)
+          dupes = sorted({s for s in listed if listed.count(s) > 1})
+          for label, items in (("ungrouped skill", missing), ("unknown skill", unknown), ("duplicated skill", dupes)):
+              for i in items:
+                  print(f"::error::{label}: {i}")
+          sys.exit(1 if (missing or unknown or dupes) else 0)
+          PY
