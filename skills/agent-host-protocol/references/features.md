@@ -28,7 +28,7 @@ message), `systemNotification`. `model`/`agent` record the selection a message w
 edit/resend; omitted → host default).
 
 **Attachments** (`MessageAttachment`, union on `type`, four variants):
-- `simple` — opaque, producer supplies the model representation.
+- `simple` — opaque; the producer supplies the model view via `modelRepresentation?: string`.
 - `embeddedResource` — small inline base64 payload (e.g. a pasted image).
 - `resource` — extends `ContentRef` (`{ uri, sizeHint?, contentType?, displayKind?, selection? }`); content
   fetched via `resourceRead` when needed.
@@ -106,9 +106,11 @@ promoted to `InputNeeded`. If the turn ends before submission, the unresolved pa
 | `single-select` | `{ kind: 'selected', value: optionId, freeformValues?: string[] }` |
 | `multi-select` | `{ kind: 'selected-many', value: optionIds[], freeformValues?: string[] }` |
 
-`ChatInputAnswer.state` separates draft/submitted (`ChatInputAnswered`) from skipped (`ChatInputSkipped`). A
-request MAY carry `url` instead of/with questions (open or review it, then complete). Server validation is in
-`actions-and-reducers.md`.
+Per-question extras: a `text` question MAY carry `defaultValue?`; a `single-select` question MAY set
+`allowFreeformInput?` (let the user type a value outside the options); each `ChatInputOption` MAY be flagged
+`recommended?`. `ChatInputAnswer.state` separates draft/submitted (`ChatInputAnswered`) from skipped
+(`ChatInputSkipped`). A request MAY carry `url` instead of/with questions (open or review it, then complete).
+Answer/complete actions reference the question by `questionId`. Server validation is in `actions-and-reducers.md`.
 
 ## Pending messages (steering & queued)
 

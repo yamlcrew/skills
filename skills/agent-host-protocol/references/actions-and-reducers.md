@@ -168,7 +168,7 @@ pending actions still apply cleanly. Rare true conflicts (two clients abort the 
 |---|:--:|---|
 | `changeset/statusChanged` | No | Transition `status` (e.g. `computing → ready`). |
 | `changeset/fileSet` | No | Upsert a `ChangesetFile` by `id`. |
-| `changeset/fileRemoved` | No | Drop a file. |
+| `changeset/fileRemoved` | No | Drop a file (by `fileId`). |
 | `changeset/filesReviewChanged` | **Yes** | Batch-set `reviewed` on listed file ids (unknown ids ignored; no-op if none match). |
 | `changeset/contentChanged` | No | Full replacement of files (+ optional operations / error). |
 | `changeset/operationsChanged` | No | Replace `operations`. |
@@ -186,7 +186,7 @@ and apply optimistically.
 | `annotations/updated` | Partially update an annotation's own props (resolve/re-open, re-anchor) without resending entries. |
 | `annotations/removed` | Remove an entire annotation (and all its entries). |
 | `annotations/entrySet` | Upsert one entry within an annotation (unknown annotation = no-op). |
-| `annotations/entryRemoved` | Remove one entry (use `annotations/removed` to drop the last remaining entry). |
+| `annotations/entryRemoved` | Remove one entry (by `entryId`; use `annotations/removed` to drop the last remaining entry). |
 
 ## Resource-watch actions (`ahp-resource-watch:/<id>`)
 
