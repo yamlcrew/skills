@@ -67,11 +67,17 @@ jobs:
       # A skill whose SKILL.md lost its `description` vanishes from skills.sh without any
       # validator complaining. Assert the discovered count matches the directory count.
       - name: Assert skills.sh discovers every skill
+        env:
+          NO_COLOR: "1"
+          FORCE_COLOR: "0"
         run: |
           set -euo pipefail
           expected=$(find skills -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
-          output=$(npx -y skills@latest add . --list 2>&1 || true)
-          found=$(printf '%s' "$output" | grep -oE 'Found [0-9]+ skills' | grep -oE '[0-9]+' || true)
+          raw=$(npx -y skills@latest add . --list 2>&1 || true)
+          # The CLI colourises its output on CI even when piped, which splits the count out of
+          # the match (`Found \e[32m8\e[39m skills`). Strip ANSI escapes before grepping.
+          output=$(printf '%s' "$raw" | sed -E $'s/\x1b\\[[0-9;]*[a-zA-Z]//g')
+          found=$(printf '%s' "$output" | grep -oE 'Found[[:space:]]+[0-9]+[[:space:]]+skills?' | grep -oE '[0-9]+' || true)
           echo "expected=$expected found=${found:-<none>}"
           if [ "$expected" != "${found:-}" ]; then
             echo "::error::skills.sh discovered ${found:-0} skills but skills/ has $expected."
