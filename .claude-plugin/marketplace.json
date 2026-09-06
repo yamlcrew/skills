@@ -89,6 +89,16 @@
       "category": "development"
     },
     {
+      "name": "markdoc",
+      "description": "Senior engineer for Markdoc, Stripe's Markdown-based document format and content framework — authors .md/.mdoc content, defines schemas, and wires the parse/transform/validate/render pipeline including the Next.js plugin.",
+      "author": {
+        "name": "yamlcrew",
+        "url": "https://github.com/yamlcrew/skills"
+      },
+      "source": "./skills/markdoc",
+      "category": "development"
+    },
+    {
       "name": "system-architect",
       "description": "Architect-level decision discipline. Forces four artifacts before any architecture recommendation ships: a booked trade-off with numbers, a cost/risk/value translation, a structural root cause, and a sequenced migration path with its enabling work first.",
       "author": {
