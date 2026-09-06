@@ -1,0 +1,11 @@
+{
+  "name": "system-architect",
+  "description": "Architect-level decision discipline. Forces four artifacts before any architecture recommendation ships: a booked trade-off with numbers, a cost/risk/value translation, a structural root cause, and a sequenced migration path with its enabling work first.",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://github.com/yamlcrew/skills"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}

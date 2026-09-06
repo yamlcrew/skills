@@ -26,10 +26,11 @@
       ]
     },
     {
-      "title": "Code Quality & Simplicity",
-      "description": "Skills that keep code minimal — fighting over-engineering, bloat, and unnecessary abstractions",
+      "title": "Engineering Judgment & Simplicity",
+      "description": "Discipline skills that fight over-engineering — at the code level by keeping it minimal, and at the system level by forcing decisions to be costed, sequenced, and owned",
       "skills": [
-        "lazy-senior-dev"
+        "lazy-senior-dev",
+        "system-architect"
       ]
     },
     {
