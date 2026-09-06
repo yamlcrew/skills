@@ -1,0 +1,11 @@
+{
+  "name": "markdoc",
+  "description": "Senior engineer for Markdoc, Stripe's Markdown-based document format and content framework — authors .md/.mdoc content, defines schemas, and wires the parse/transform/validate/render pipeline including the Next.js plugin.",
+  "author": {
+    "name": "yamlcrew",
+    "url": "https://yamlcrew.ai"
+  },
+  "homepage": "https://yamlcrew.ai",
+  "repository": "https://github.com/yamlcrew/skills",
+  "license": "MIT"
+}
